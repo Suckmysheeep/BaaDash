@@ -1,0 +1,298 @@
+@font-face {
+  font-family: BaaDashSC;
+  src: url(assets/NotoSansSC-Variable.woff2) format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: #111216;
+  color: #efeff0;
+  font-family: BaaDashSC, "Microsoft YaHei UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+}
+a {
+  color: inherit;
+  text-underline-offset: 4px;
+}
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+header {
+  max-width: 1200px;
+  margin: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 28px;
+  border-bottom: 1px solid #ffffff14;
+}
+.brand img {
+  width: 176px;
+  height: 44px;
+}
+nav {
+  display: flex;
+  gap: 26px;
+  font-size: 13px;
+}
+nav a {
+  text-decoration: none;
+  color: #aaa;
+}
+nav a:hover {
+  color: #fff;
+}
+main {
+  max-width: 1120px;
+  margin: auto;
+  padding: 0 28px;
+}
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+h1 {
+  font-size: 48px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.35;
+}
+h2 {
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.025em;
+}
+h3 {
+  font-size: 18px;
+  font-weight: 550;
+}
+.hero {
+  text-align: center;
+  padding: 68px 0 36px;
+}
+.hero-logo {
+  width: 480px;
+  margin: 24px auto 26px;
+}
+.hero h1 {
+  font-size: 43px;
+}
+.hero p {
+  max-width: 620px;
+  margin: 0 auto 24px;
+  color: #b3b4b8;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: #81838b;
+}
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 26px 0;
+}
+.button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  text-decoration: none;
+  border: 1px solid #ffffff29;
+  padding: 11px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.button:hover {
+  background: #ffffff0c;
+}
+.primary {
+  background: #efeff0;
+  color: #17181c;
+}
+.primary:hover {
+  background: #fff;
+}
+.small {
+  font-size: 12px;
+}
+.muted {
+  color: #888b94 !important;
+}
+figure {
+  margin: 28px 0;
+}
+figure > img {
+  border: 1px solid #ffffff17;
+  border-radius: 12px;
+}
+figcaption {
+  font-size: 11px;
+  color: #888b94;
+  text-align: center;
+  margin-top: 12px;
+}
+.wide {
+  margin: 12px -12px 0;
+}
+.wide > img {
+  box-shadow: 0 35px 90px #0006;
+}
+.section {
+  padding: 72px 0 32px;
+  border-top: 1px solid #ffffff15;
+  margin-top: 50px;
+}
+.section > .eyebrow {
+  margin-bottom: 20px;
+}
+.lede {
+  font-size: 17px;
+  max-width: 780px;
+  color: #a9abb2;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin: 32px 0;
+}
+.cards article {
+  padding: 25px;
+  border: 1px solid #ffffff18;
+  border-radius: 12px;
+  background: #17181c;
+}
+.cards p {
+  color: #9699a3;
+  font-size: 13px;
+}
+.cards h2 {
+  font-size: 25px;
+}
+.cards .button {
+  width: 100%;
+  padding: 9px;
+}
+.duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: center;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #18191d;
+  border-radius: 14px;
+  padding: 30px;
+}
+.panel img {
+  max-width: 340px;
+}
+.document {
+  padding-top: 62px;
+}
+.document h1 {
+  margin: 16px 0;
+}
+.document li {
+  margin-bottom: 10px;
+  color: #b8bac1;
+}
+.document .section h2:not(:first-child) {
+  margin-top: 38px;
+}
+pre {
+  padding: 24px;
+  border: 1px solid #ffffff20;
+  border-radius: 10px;
+  overflow: auto;
+  background: #191a1f;
+  color: #c1c3ca;
+  font:
+    13px/1.9 Consolas,
+    monospace;
+}
+footer {
+  max-width: 1120px;
+  margin: 70px auto 0;
+  padding: 38px 28px;
+  border-top: 1px solid #ffffff15;
+  color: #797c86;
+  font-size: 12px;
+}
+footer img {
+  margin-bottom: 20px;
+}
+footer p {
+  margin: 5px 0;
+}
+@media (max-width: 720px) {
+  header {
+    padding: 12px 18px;
+    gap: 10px;
+  }
+  .brand img {
+    width: 125px;
+  }
+  nav {
+    gap: 12px;
+    font-size: 11px;
+  }
+  nav a:first-child {
+    display: none;
+  }
+  main {
+    padding: 0 18px;
+  }
+  .hero {
+    padding-top: 42px;
+  }
+  h1,
+  .hero h1 {
+    font-size: 31px;
+  }
+  h2 {
+    font-size: 26px;
+  }
+  .cards,
+  .duo {
+    grid-template-columns: 1fr;
+  }
+  .section {
+    padding-top: 42px;
+    margin-top: 30px;
+  }
+  .hero-logo {
+    width: 360px;
+  }
+  .wide {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .lede {
+    font-size: 15px;
+  }
+  .actions {
+    flex-wrap: wrap;
+  }
+  .document {
+    padding-top: 40px;
+  }
+}

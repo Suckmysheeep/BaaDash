@@ -1,0 +1,9 @@
+/target
+/extension-key.pem
+node_modules/
+/app/src-tauri/gen/
+/.claude/
+node_modules/
+dist/
+
+/video/out/

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>下载与安装 · BaaDash</title>
+    <meta
+      name="description"
+      content="BaaDash：免费、开源的桌面下载管理器。多连接下载、断点续传、安静的浏览器集成。"
+    />
+    <meta property="og:title" content="BaaDash" />
+    <meta property="og:image" content="assets/social-preview.png" />
+    <meta name="theme-color" content="#111216" />
+    <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="site.css" />
+    <script src="site.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="index.html" aria-label="BaaDash 首页"
+        ><img
+          src="assets/logo-wordmark-dark.svg"
+          alt="BaaDash"
+          width="176"
+          height="44"
+      /></a>
+      <nav>
+        <a href="index.html#features">功能</a
+        ><a href="download.html">下载与安装</a
+        ><a href="changelog.html">更新记录</a
+        ><a href="https://github.com/Suckmysheeep/BaaDash">源码 ↗</a>
+      </nav>
+    </header>
+    <main class="document">
+      <div class="eyebrow">DOWNLOAD & SETUP</div>
+      <h1>从一个下载开始。</h1>
+      <p class="lede">请按平台选择安装包。Windows 当前用户安装无需管理员权限，macOS 同时支持 Apple 芯片与 Intel。</p>
+      <div class="cards">
+        <article>
+          <h2>Windows</h2>
+          <p>Windows 10 / 11，64 位。选择 x64-setup.exe，当前用户安装。</p>
+          <a
+            class="button"
+            data-platform="windows"
+            href="https://github.com/Suckmysheeep/BaaDash/releases/latest"
+            >查看 Windows 安装包 ↗</a
+          >
+        </article>
+        <article>
+          <h2>macOS</h2>
+          <p>选择 universal.dmg，支持 Apple 芯片与 Intel。</p>
+          <a
+            class="button"
+            data-platform="macos"
+            href="https://github.com/Suckmysheeep/BaaDash/releases/latest"
+            >查看 macOS 安装包 ↗</a
+          >
+        </article>
+        <article>
+          <h2>Linux</h2>
+          <p>按发行版选择 AppImage、deb 或 rpm。</p>
+          <a
+            class="button"
+            data-platform="linux"
+            href="https://github.com/Suckmysheeep/BaaDash/releases/latest"
+            >查看 Linux 安装包 ↗</a
+          >
+        </article>
+      </div>
+      <section class="section">
+        <h2>连接浏览器</h2>
+        <ol>
+          <li>打开桌面应用，在设置 → 浏览器中打开扩展文件夹。</li>
+          <li>Chrome 系浏览器进入扩展管理页，开启开发者模式，加载该文件夹。</li>
+          <li>
+            Firefox 需要 140 及以上版本：在应用内选择 Firefox 会打开对应的附加组件页，也可下载 XPI 后在 about:debugging 临时载入。
+          </li>
+          <li>打开扩展弹窗，确认已连接，再分别选择接管、嗅探和浮层偏好。</li>
+        </ol>
+        <p>
+          请加载应用附带的原文件夹，方便后续随应用同步更新。
+        </p>
+        <figure>
+          <img
+            src="assets/gallery/settings-browser.png"
+            width="1120"
+            height="700"
+            alt="浏览器集成设置"
+          />
+        </figure>
+      </section>
+      <section class="section">
+        <h2>偏好建议</h2>
+        <p>
+          默认保留资源嗅探与视频入口，关闭图片浮层。希望完全安静时，可关闭视频浮层，从扩展弹窗主动查看资源。普通下载接管不受这些浮层开关影响。
+        </p>
+        <h2>从源码构建</h2>
+        <p>需要 Rust、Node.js 22+ 与 Tauri 2 的平台构建依赖。</p>
+        <pre>
+git clone https://github.com/Suckmysheeep/BaaDash.git
+cd BaaDash
+cargo install tauri-cli --version "^2" --locked
+npm ci --prefix app
+npm run build --prefix app
+cd app/src-tauri
+cargo tauri build</pre>
+        <p>
+          本地功能验收与资源生成命令见仓库 README；发布渠道将在正式发布前确定。
+        </p>
+      </section>
+    </main>
+    <footer>
+      <img
+        src="assets/logo-type-dark.svg"
+        width="94"
+        height="18"
+        alt="BaaDash"
+      />
+      <p>免费、开源 · Windows / macOS / Linux</p>
+      <p>
+        基于
+        <a href="https://github.com/harshsinghsv/swiftdl">SwiftDL</a>
+        独立维护。<a href="https://github.com/Suckmysheeep/BaaDash"
+          >项目源码</a
+        >
+        ·
+        <a href="https://github.com/Suckmysheeep/BaaDash/issues">反馈问题</a>
+      </p>
+    </footer>
+  </body>
+</html>

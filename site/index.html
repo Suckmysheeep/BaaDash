@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>下载继续，浏览照常 · BaaDash</title>
+    <meta
+      name="description"
+      content="BaaDash：免费、开源的桌面下载管理器。多连接下载、断点续传、安静的浏览器集成。"
+    />
+    <meta property="og:title" content="BaaDash" />
+    <meta property="og:image" content="assets/social-preview.png" />
+    <meta name="theme-color" content="#111216" />
+    <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="site.css" />
+    <script src="site.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="index.html" aria-label="BaaDash 首页"
+        ><img
+          src="assets/logo-wordmark-dark.svg"
+          alt="BaaDash"
+          width="176"
+          height="44"
+      /></a>
+      <nav>
+        <a href="index.html#features">功能</a
+        ><a href="download.html">下载与安装</a
+        ><a href="changelog.html">更新记录</a
+        ><a href="https://github.com/Suckmysheeep/BaaDash">源码 ↗</a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <div class="eyebrow">FREE & OPEN SOURCE DOWNLOAD MANAGER</div>
+        <img
+          class="hero-logo"
+          src="assets/logo-wordmark-dark.svg"
+          alt="BaaDash"
+          width="480"
+          height="120"
+        />
+        <h1>下载继续，浏览照常。</h1>
+        <p>
+          把文件交给队列，把屏幕留给内容。多连接下载、断点续传，以及按需出现的浏览器入口。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="download.html">下载与安装</a
+          ><a class="button" href="#features">看看它能做什么 ↓</a>
+        </div>
+        <p class="small muted">
+          BaaDash v0.1.0 已发布，支持 Windows、macOS 与 Linux。
+        </p>
+      </section>
+      <figure class="wide">
+        <img
+          src="assets/app-dark.png"
+          alt="BaaDash 深色界面，多连接下载和分类任务列表"
+          width="1120"
+          height="700"
+        />
+        <figcaption>真实界面预览 · 任务名称、速度与地址为模拟数据</figcaption>
+      </figure>
+      <section id="features" class="section">
+        <div class="eyebrow">01 / FOCUS</div>
+        <h2>能发现资源，也懂得保持安静。</h2>
+        <p class="lede">
+          嗅探、视频浮层、图片浮层和普通下载接管分别控制。图片按钮默认关闭，视频入口在鼠标静止后自动隐藏。
+        </p>
+        <div class="cards">
+          <article>
+            <h3>独立嗅探开关</h3>
+            <p>
+              不想检测时直接关闭。只关闭网页浮层，则仍可从扩展弹窗查看检测结果。
+            </p>
+          </article>
+          <article>
+            <h3>图片按需下载</h3>
+            <p>保留右键下载与主动收集本页图片；可仅对指定网站开启图片浮层。</p>
+          </article>
+          <article>
+            <h3>播放器不重叠</h3>
+            <p>视频封面不再视作普通图片；同一区域只保留视频入口。</p>
+          </article>
+        </div>
+        <figure class="panel">
+          <img
+            src="assets/gallery/extension-dark.png"
+            alt="扩展独立的嗅探与浮层开关"
+            width="320"
+          />
+          <figcaption>浏览器扩展 · 开关立即生效</figcaption>
+        </figure>
+      </section>
+      <section class="section">
+        <div class="eyebrow">02 / CONTROL</div>
+        <h2>一项下载，或一整个列表。</h2>
+        <p class="lede">
+          显式多选、Ctrl / Cmd 多选、Shift
+          连选。批量暂停、继续和重试；清理记录时默认保留文件。
+        </p>
+        <figure>
+          <img
+            src="assets/gallery/batch-manage.png"
+            width="1120"
+            height="700"
+            alt="多选任务与批量管理工具栏"
+          />
+        </figure>
+        <div class="cards">
+          <article>
+            <h3>批量导入</h3>
+            <p>从分享文字里提取 HTTP / HTTPS 链接，自动去重并加入队列。</p>
+          </article>
+          <article>
+            <h3>分类与主题</h3>
+            <p>按文件类型整理，支持中文文件名，深色、浅色与系统主题。</p>
+          </article>
+          <article>
+            <h3>可见的更新入口</h3>
+            <p>在设置的关于页手动检查更新，查看检查结果与更新说明。</p>
+          </article>
+        </div>
+      </section>
+      <section class="section">
+        <div class="eyebrow">03 / RELIABILITY</div>
+        <h2>多连接与续传，先保证文件正确。</h2>
+        <p class="lede">
+          支持 HTTP
+          区间下载、动态分段和进度保存。服务器返回错误区间、续传记录不匹配或文件不完整时停止并提示。
+        </p>
+        <div class="duo">
+          <figure>
+            <img
+              src="assets/gallery/download-new.png"
+              alt="下载前确认信息"
+              width="584"
+            />
+            <figcaption>开始前确认文件与保存位置</figcaption>
+          </figure>
+          <figure>
+            <img
+              src="assets/gallery/download-progress.png"
+              alt="下载进度和连接信息"
+              width="584"
+            />
+            <figcaption>查看进度、速度与连接状态</figcaption>
+          </figure>
+        </div>
+        <p class="small muted">
+          实际速度受服务器、网络和磁盘影响；不支持 DRM
+          或绕过站点访问限制。续传也取决于服务器支持与文件版本校验。
+        </p>
+      </section>
+      <section class="section">
+        <h2>视频、图片，以及你的工作文件。</h2>
+        <p class="lede">
+          支持可解析的视频与流媒体、当前 Pixiv 作品、视频另存
+          GIF、磁力链接和种子。以你有权保存的内容为范围。
+        </p>
+        <figure>
+          <img
+            src="assets/gallery/main-light.png"
+            width="1120"
+            height="700"
+            alt="BaaDash 浅色主题"
+          />
+        </figure>
+        <div class="actions">
+          <a class="button primary" href="download.html">查看安装方式</a
+          ><a
+            class="button"
+            href="https://github.com/Suckmysheeep/BaaDash/blob/main/README.md"
+            >项目文档 ↗</a
+          >
+        </div>
+      </section>
+    </main>
+    <footer>
+      <img
+        src="assets/logo-type-dark.svg"
+        width="94"
+        height="18"
+        alt="BaaDash"
+      />
+      <p>免费、开源 · Windows / macOS / Linux</p>
+      <p>
+        基于
+        <a href="https://github.com/harshsinghsv/swiftdl">SwiftDL</a>
+        独立维护。<a href="https://github.com/Suckmysheeep/BaaDash"
+          >项目源码</a
+        >
+        ·
+        <a href="https://github.com/Suckmysheeep/BaaDash/issues">反馈问题</a>
+      </p>
+    </footer>
+  </body>
+</html>

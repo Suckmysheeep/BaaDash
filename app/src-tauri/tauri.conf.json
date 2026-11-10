@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "BaaDash",
+  "version": "0.1.0",
+  "identifier": "com.swiftdl.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5179",
+    "beforeDevCommand": {
+      "script": "npm run dev",
+      "cwd": ".."
+    }
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "BaaDash",
+        "width": 1120,
+        "height": 700,
+        "minWidth": 820,
+        "minHeight": 520,
+        "center": true,
+        "decorations": false,
+        "shadow": true,
+        "backgroundColor": "#101114",
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Utility",
+    "shortDescription": "支持多连接与断点续传的高速下载管理器",
+    "longDescription": "BaaDash 通过多连接拆分文件提升下载速度，支持崩溃或断网后的断点续传，并可接管浏览器下载。",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../../extension/": "extension/",
+      "gen/extension-firefox/": "extension-firefox/"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["SimpChinese", "English"],
+        "installerIcon": "icons/icon.ico",
+        "sidebarImage": "windows/sidebar.bmp",
+        "headerImage": "windows/header.bmp",
+        "installerHooks": "./windows/hooks.nsh"
+      },
+      "wix": {
+        "language": "zh-CN"
+      }
+    }
+  }
+}

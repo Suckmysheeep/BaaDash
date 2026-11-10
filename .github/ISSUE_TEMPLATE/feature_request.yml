@@ -1,0 +1,25 @@
+name: 功能建议
+description: 为 BaaDash 提出改进建议
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 这个建议要解决什么问题？
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 希望实现什么效果？
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 考虑过哪些替代方案？
+  - type: textarea
+    id: boundary
+    attributes:
+      label: 使用场景与边界
+      description: 请说明典型使用场景。本站不接受绕过 DRM、会员、登录或其他访问限制的请求。

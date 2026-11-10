@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>BaaDash 下载助手</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <img src="logo.svg" alt="" width="28" height="28" />
+      <span class="id"
+        ><b>BaaDash</b
+        ><span class="status" id="status"
+          ><i></i><span>正在检查</span></span
+        ></span
+      >
+      <button id="open" class="icon" title="打开 BaaDash">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"
+          />
+        </svg>
+      </button>
+    </header>
+
+    <main id="main">
+      <section id="quick" hidden>
+        <div class="label">一键下载</div>
+        <button class="quick-action" id="pixiv-download" hidden>
+          <span class="qa-icon">↓</span
+          ><span class="qa-text"
+            ><b>当前 Pixiv 作品</b><span id="pixiv-count">全部原图</span></span
+          >
+        </button>
+        <button class="quick-action" id="images-download" hidden>
+          <span class="qa-icon">↓</span
+          ><span class="qa-text"
+            ><b>本页已加载图片</b><span id="images-count">自动去重</span></span
+          >
+        </button>
+        <p class="quick-error" id="quick-error" hidden></p>
+      </section>
+      <section id="found" hidden>
+        <div class="label">此页面中的资源</div>
+        <div id="media"></div>
+      </section>
+
+      <label class="row">
+        <span class="txt">接管浏览器下载</span>
+        <span class="switch"
+          ><input type="checkbox" id="enabled" /><i></i
+        ></span>
+      </label>
+      <label class="row" id="site-row">
+        <span class="txt">在 <span id="site" class="host"></span> 上启用</span>
+        <span class="switch"
+          ><input type="checkbox" id="site-on" /><i></i
+        ></span>
+      </label>
+      <label class="row">
+        <span class="txt">忽略小于此大小的文件</span>
+        <span class="select"
+          ><select id="min-size">
+            <option value="0">关闭</option>
+            <option value="512">512 KB</option>
+            <option value="1024">1 MB</option>
+            <option value="5120">5 MB</option>
+            <option value="20480">20 MB</option>
+          </select></span
+        >
+      </label>
+
+      <div class="pref-heading">资源检测与网页按钮</div>
+      <label class="row"
+        ><span class="txt">视频 / 音频资源嗅探</span
+        ><span class="switch"
+          ><input type="checkbox" id="pref-sniffing" /><i></i></span
+      ></label>
+      <label class="row"
+        ><span class="txt">视频下载浮层</span
+        ><span class="switch"
+          ><input type="checkbox" id="pref-videoButtons" /><i></i></span
+      ></label>
+      <label class="row"
+        ><span class="txt">图片下载浮层（所有网站）</span
+        ><span class="switch"
+          ><input type="checkbox" id="pref-imageButtons" /><i></i></span
+      ></label>
+      <label class="row" id="image-site-row"
+        ><span class="txt">仅在此网站显示图片按钮</span
+        ><span class="switch"
+          ><input type="checkbox" id="pref-imageSite" /><i></i></span
+      ></label>
+      <p class="hint">
+        关闭浮层仍可通过扩展弹窗或右键下载；关闭嗅探会清除已检测列表。
+      </p>
+      <p class="hint">按住 <kbd>Alt</kbd> 点击链接，可使用浏览器直接下载</p>
+    </main>
+
+    <div class="missing" id="missing" hidden>
+      <b>无法连接 BaaDash</b>
+      <span>请先打开应用。如果应用已打开，请重启浏览器。</span>
+      <a
+        href="https://github.com/Suckmysheeep/BaaDash/releases/latest"
+        target="_blank"
+        class="btn"
+        >下载 BaaDash</a
+      >
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

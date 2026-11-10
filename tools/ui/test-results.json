@@ -1,0 +1,17 @@
+{
+  "passed": [
+    "Every settings tab can close via X",
+    "Manual update check reports a result",
+    "Latest-version and network-error states are visible",
+    "Select-all and exit selection",
+    "Clearing completed records preserves active tasks; delete-files defaults off",
+    "Ctrl multi-select and batch pause",
+    "820px and 1120px layouts have no document overflow",
+    "Images have no overlay by default",
+    "Poster never displays an image button over a video",
+    "Video overlay auto-hides while pointer rests and can be summoned again",
+    "Disabling sniffing immediately hides and suppresses video overlay",
+    "Site-only image preference and site disable apply without reload"
+  ],
+  "errors": []
+}

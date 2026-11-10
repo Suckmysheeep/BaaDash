@@ -1,0 +1,165 @@
+# Push a version tag to build every desktop platform and both browser
+# extensions, then publish the draft only after every build and validation succeeds.
+# To rebuild an existing tag, run this workflow by hand and give the tag.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build, e.g. v0.3.6
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  # One release for all builds, so parallel jobs don't race to create it.
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.release.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${TAG#v}"
+          awk -v head="## [$version]" '
+            index($0, head) == 1 { on = 1; next }
+            on && index($0, "## [") == 1 { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          cat >> notes.md <<'EOF'
+
+          ### 安装说明
+          - **Windows：** `BaaDash_*_x64-setup.exe`，当前用户安装，无需管理员权限。
+          - **macOS：** `BaaDash_*_universal.dmg`，支持 Apple 芯片和 Intel。
+          - **Linux：** 按发行版选择 `.AppImage`、`.deb` 或 `.rpm`。
+          - **浏览器扩展：** 应用已附带扩展，打开 BaaDash 并点击「获取浏览器扩展」即可查看引导。也可单独下载 `baadash-extension.zip`（Chromium 浏览器）或 `baadash-firefox.xpi`（Firefox 140+）。
+
+          BaaDash 是基于 [harshsinghsv/swiftdl](https://github.com/harshsinghsv/swiftdl) 独立维护的非官方中文项目。应用与扩展已内置 Noto Sans SC 开源中文字体。分享文本功能仅提取普通链接，不绕过登录、会员、DRM 或网站访问限制。
+          EOF
+      - name: Create or update draft release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Web UI users may create the tag by publishing a placeholder release.
+          # Reuse it when present, so both tag pushes and manual rebuilds work.
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .id 2>/dev/null) || id=""
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -f name="BaaDash $TAG" -F draft=true -F body=@notes.md > /dev/null
+          else
+            id=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" -f tag_name="$TAG" -f name="BaaDash $TAG" -F draft=true -F body=@notes.md --jq .id)
+          fi
+          test -n "$id"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+  app:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+          - platform: ubuntu-22.04
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Build the interface
+        working-directory: app
+        run: npm ci && npm run build
+
+      - name: Test the Rust workspace
+        if: matrix.platform == 'ubuntu-22.04'
+        run: cargo test --workspace
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: app/src-tauri
+          tauriScript: npx --yes @tauri-apps/cli@2
+          releaseId: ${{ needs.create-release.outputs.id }}
+          args: ${{ matrix.args }}
+
+  extension:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Zip and attach the extension
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          (cd extension && zip -r ../baadash-extension.zip .)
+          # The Firefox add-on: the same files with Firefox's manifest
+          # (keep in step with app/src-tauri/build.rs).
+          cp -r extension firefox
+          jq 'del(.key) | .background = {scripts: ["background.js"]}
+              | .browser_specific_settings = {gecko: {id: "swiftdl@harshhh.me", strict_min_version: "140.0",
+                  data_collection_permissions: {required: ["none"]}}}' \
+            extension/manifest.json > firefox/manifest.json
+          (cd firefox && zip -r ../baadash-firefox.xpi .)
+          gh release upload "$TAG" baadash-extension.zip baadash-firefox.xpi --clobber
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix app
+      - run: npm run build --prefix app
+      - run: npm ci --prefix tools/brand
+      - run: npm run check --prefix tools/brand
+      - run: npm ci --prefix tools/ui
+      - run: npm run test --prefix tools/ui
+
+  publish:
+    needs: [create-release, app, extension, validate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish completed release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.create-release.outputs.id }}
+        run: |
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" -F draft=false -f make_latest=true

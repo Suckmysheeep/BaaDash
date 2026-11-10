@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BaaDash</title>
+  </head>
+  <body>
+    <div class="app">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="side-top" data-tauri-drag-region>
+          <div class="brand" data-tauri-drag-region>
+            <img src="logo.svg" alt="" width="24" height="24" /><img
+              class="brand-type wordmark-light"
+              src="logo-type.svg"
+              alt="BaaDash"
+              width="94"
+              height="18"
+            /><img
+              class="brand-type wordmark-dark"
+              src="logo-type-dark.svg"
+              alt="BaaDash"
+              width="94"
+              height="18"
+            />
+          </div>
+          <button class="sq-btn" id="btn-palette" title="搜索与命令（Ctrl K）">
+            <i data-icon="search"></i>
+          </button>
+          <button
+            class="sq-btn bordered"
+            id="btn-add"
+            title="新建下载（Ctrl N）"
+          >
+            <i data-icon="compose"></i>
+          </button>
+        </div>
+        <nav class="nav" id="nav"></nav>
+        <div class="side-bottom">
+          <div class="net" id="net">
+            <div class="net-head">
+              <span>网络</span
+              ><button class="limit" id="limit-btn" title="下载限速"></button>
+            </div>
+            <div class="net-speed">
+              <b id="net-speed">0</b><span id="net-unit">B/s</span>
+            </div>
+            <canvas id="net-graph"></canvas>
+            <div class="net-foot" id="net-foot">空闲</div>
+          </div>
+          <button class="nav-item" id="btn-settings">
+            <span class="ni-icon"><i data-icon="settings"></i></span
+            ><span class="ni-label">设置</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main card -->
+      <main class="main">
+        <header class="header" data-tauri-drag-region>
+          <div class="h-title" data-tauri-drag-region>
+            <span class="h-icon" id="h-icon"></span
+            ><span id="h-name">全部下载</span
+            ><span class="h-count" id="h-count"></span>
+          </div>
+          <div class="h-actions">
+            <button class="ghost-btn" id="btn-pause-all">
+              <i data-icon="pause"></i>全部暂停
+            </button>
+            <button class="ghost-btn" id="btn-resume-all">
+              <i data-icon="play"></i>全部继续
+            </button>
+            <button class="ghost-btn" id="btn-select" title="选择多个任务">
+              多选
+            </button>
+            <button
+              class="ghost-btn"
+              id="btn-history"
+              title="清理当前视图中的已完成与失败记录"
+            >
+              清理历史
+            </button>
+            <button class="search-btn" id="btn-search">
+              <i data-icon="search"></i><span>搜索</span><kbd>Ctrl K</kbd>
+            </button>
+            <span class="win-ctrls" id="win-ctrls">
+              <button id="w-min" title="最小化">
+                <svg viewBox="0 0 10 10"><path d="M1 5h8" /></svg>
+              </button>
+              <button id="w-max" title="最大化">
+                <svg viewBox="0 0 10 10">
+                  <rect x="1.5" y="1.5" width="7" height="7" rx="1.2" />
+                </svg>
+              </button>
+              <button id="w-close" class="close" title="关闭">
+                <svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2 2 8" /></svg>
+              </button>
+            </span>
+          </div>
+        </header>
+        <div class="bulk-bar" id="bulk-bar" hidden>
+          <label><input type="checkbox" id="bulk-all" /> 全选当前列表</label
+          ><span id="bulk-count"></span><span class="grow"></span
+          ><button class="btn sm" id="bulk-pause">暂停</button
+          ><button class="btn sm" id="bulk-resume">继续 / 重试</button
+          ><button class="btn sm" id="bulk-remove">移除…</button
+          ><button class="sq-btn" id="bulk-exit" title="退出多选">×</button>
+        </div>
+        <div class="body">
+          <div class="list" id="list">
+            <div class="onboard" id="update" hidden></div>
+            <div class="onboard" id="onboard" hidden></div>
+            <div id="rows"></div>
+            <div class="empty" id="empty" hidden>
+              <div class="empty-icon"><i data-icon="download"></i></div>
+              <h2 id="empty-title">还没有下载任务</h2>
+              <p id="empty-text">
+                粘贴链接、将链接拖到此窗口，或在浏览器中开始下载。
+              </p>
+              <div class="empty-actions" id="empty-actions">
+                <button class="btn primary" id="empty-add">
+                  <i data-icon="plus"></i>新建下载 <kbd>Ctrl N</kbd>
+                </button>
+                <button class="btn" id="empty-ext">
+                  <i data-icon="globe"></i>获取浏览器扩展
+                </button>
+              </div>
+            </div>
+          </div>
+          <aside class="inspector" id="inspector" hidden></aside>
+        </div>
+      </main>
+    </div>
+
+    <div class="toasts" id="toasts"></div>
+    <div class="drop" id="drop" hidden>
+      <div class="drop-card">
+        <i data-icon="download"></i><b>松开即可下载</b
+        ><span>BaaDash 会先获取文件信息</span>
+      </div>
+    </div>
+
+    <!-- Command palette -->
+    <dialog id="dlg-palette" class="modal palette">
+      <div class="pal-input">
+        <i data-icon="search"></i
+        ><input
+          id="pal-q"
+          placeholder="搜索下载任务或输入命令…"
+          autocomplete="off"
+          spellcheck="false"
+        /><kbd>Esc</kbd>
+      </div>
+      <div class="pal-list" id="pal-list"></div>
+      <div class="pal-foot">
+        <span><kbd>↑</kbd><kbd>↓</kbd> 切换</span
+        ><span><kbd>Enter</kbd> 选择</span><span><kbd>Esc</kbd> 关闭</span>
+      </div>
+    </dialog>
+
+    <!-- New download -->
+    <dialog id="dlg-add" class="modal composer">
+      <form method="dialog" id="form-add">
+        <div class="comp-top">
+          <span class="crumb"
+            ><img src="logo.svg" alt="" width="14" height="14" />BaaDash</span
+          ><i data-icon="chevron" class="crumb-sep"></i
+          ><span class="crumb-cur">新建下载</span>
+          <span class="grow"></span>
+          <button type="button" class="sq-btn" id="add-x" title="关闭（Esc）">
+            <i data-icon="x"></i>
+          </button>
+        </div>
+        <input
+          id="add-url"
+          class="comp-url"
+          type="text"
+          placeholder="粘贴链接或整段分享文本…"
+          required
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="comp-file" id="add-file" hidden>
+          <div id="add-tile"></div>
+          <div class="cf-body">
+            <input
+              id="add-filename"
+              class="cf-name"
+              spellcheck="false"
+              aria-label="文件名"
+            />
+            <div class="cf-sub" id="add-sub"></div>
+          </div>
+        </div>
+        <div class="comp-state" id="add-state"></div>
+        <div class="chips" id="add-chips"></div>
+        <div class="comp-foot">
+          <button type="button" class="ghost-btn" id="add-paste">
+            <i data-icon="clipboard"></i>粘贴
+          </button>
+          <button type="button" class="ghost-btn" id="add-batch">
+            <i data-icon="plus"></i>批量导入
+          </button>
+          <span class="grow"></span>
+          <button type="button" class="btn" id="add-later">稍后下载</button>
+          <button type="submit" class="btn primary" id="add-start">
+            开始下载 <kbd>Ctrl ↵</kbd>
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Batch import from links and Chinese app share text -->
+    <dialog id="dlg-batch" class="modal composer batch">
+      <form method="dialog" id="form-batch">
+        <div class="comp-top">
+          <span class="crumb"
+            ><img src="logo.svg" alt="" width="14" height="14" />BaaDash</span
+          ><i data-icon="chevron" class="crumb-sep"></i
+          ><span class="crumb-cur">批量导入</span>
+          <span class="grow"></span>
+          <button type="button" class="sq-btn" id="batch-x" title="关闭（Esc）">
+            <i data-icon="x"></i>
+          </button>
+        </div>
+        <textarea
+          id="batch-text"
+          class="batch-text"
+          rows="7"
+          placeholder="粘贴一个或多个链接，也可以直接粘贴 App 的整段分享文本。&#10;BaaDash 只提取其中的 HTTP／HTTPS 链接，不解析或绕过网站限制。"
+          spellcheck="false"
+        ></textarea>
+        <div class="comp-state" id="batch-state">
+          支持混合文字、多个链接和自动去重。
+        </div>
+        <div class="batch-list" id="batch-list"></div>
+        <div class="comp-foot">
+          <button type="button" class="ghost-btn" id="batch-paste">
+            <i data-icon="clipboard"></i>从剪贴板粘贴
+          </button>
+          <span class="grow"></span>
+          <button type="button" class="btn" id="batch-later" disabled>
+            稍后下载
+          </button>
+          <button type="submit" class="btn primary" id="batch-start" disabled>
+            开始下载
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Settings -->
+    <dialog id="dlg-settings" class="modal settings">
+      <form method="dialog" id="form-settings">
+        <nav class="set-nav" id="set-nav">
+          <div class="set-nav-title">设置</div>
+          <button type="button" data-tab="general" class="on">
+            <i data-icon="sliders"></i>常规
+          </button>
+          <button type="button" data-tab="speed">
+            <i data-icon="gauge"></i>下载速度
+          </button>
+          <button type="button" data-tab="browser">
+            <i data-icon="globe"></i>浏览器
+          </button>
+          <button type="button" data-tab="about">
+            <i data-icon="info"></i>关于
+          </button>
+        </nav>
+        <div class="set-main">
+          <button
+            type="button"
+            class="sq-btn settings-close"
+            id="settings-close"
+            aria-label="关闭设置"
+            title="关闭设置（Esc）"
+          >
+            ×
+          </button>
+          <section data-panel="general">
+            <h2>常规</h2>
+            <div class="set-group">
+              <div class="set-row">
+                <div class="sr-text">
+                  <b>主题</b><span>跟随系统可自动匹配电脑的浅色或深色外观</span>
+                </div>
+                <div class="seg theme-seg" id="set-theme">
+                  <button type="button" data-v="system">跟随系统</button
+                  ><button type="button" data-v="light">浅色</button
+                  ><button type="button" data-v="dark">深色</button>
+                </div>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-row">
+                <div class="sr-text">
+                  <b>下载目录</b><span id="set-dir"></span>
+                </div>
+                <button type="button" class="btn sm" id="set-browse">
+                  更改…
+                </button>
+              </div>
+              <label class="set-row"
+                ><div class="sr-text">
+                  <b>按文件类型分类</b
+                  ><span>将视频、音乐、程序和压缩文件分别保存到对应文件夹</span>
+                </div>
+                <span class="switch"
+                  ><input type="checkbox" id="set-sort" /><i></i></span
+              ></label>
+            </div>
+            <div class="set-group">
+              <label class="set-row"
+                ><div class="sr-text">
+                  <b>确认浏览器下载</b
+                  ><span>浏览器下载开始前显示“新建下载”窗口</span>
+                </div>
+                <span class="switch"
+                  ><input type="checkbox" id="set-ask" /><i></i></span
+              ></label>
+              <label class="set-row"
+                ><div class="sr-text">
+                  <b>完成通知</b><span>下载完成后通知我</span>
+                </div>
+                <span class="switch"
+                  ><input type="checkbox" id="set-notify" /><i></i></span
+              ></label>
+            </div>
+            <div class="set-group">
+              <div class="set-row col">
+                <div class="sr-text">
+                  <b>种子下载完成后</b
+                  ><span>继续做种可以帮助他人下载，已下载的文件不受影响。</span>
+                </div>
+                <div class="seg" id="set-seed">
+                  <button type="button" data-v="stop">停止做种</button
+                  ><button type="button" data-v="1">分享率 1</button
+                  ><button type="button" data-v="2">分享率 2</button
+                  ><button type="button" data-v="forever">持续做种</button>
+                </div>
+              </div>
+            </div>
+            <div class="set-group">
+              <label class="set-row"
+                ><div class="sr-text">
+                  <b>每个下载显示独立窗口</b
+                  ><span>查看实时进度、连接状态和“下载完成”摘要</span>
+                </div>
+                <span class="switch"
+                  ><input type="checkbox" id="set-progress-win" /><i></i></span
+              ></label>
+              <label class="set-row"
+                ><div class="sr-text">
+                  <b>关闭后保留在系统托盘</b
+                  ><span>关闭窗口后继续下载并保持浏览器集成运行</span>
+                </div>
+                <span class="switch"
+                  ><input type="checkbox" id="set-tray" /><i></i></span
+              ></label>
+            </div>
+          </section>
+          <section data-panel="speed" hidden>
+            <h2>下载速度</h2>
+            <div class="set-group">
+              <div class="set-row">
+                <div class="sr-text">
+                  <b>每个任务的连接数</b
+                  ><span>服务器限制单连接速度时，增加连接数通常更快</span>
+                </div>
+                <div class="stepper" data-for="set-conns">
+                  <button type="button" data-d="-1">−</button
+                  ><input
+                    id="set-conns"
+                    type="number"
+                    min="1"
+                    max="32"
+                  /><button type="button" data-d="1">+</button>
+                </div>
+              </div>
+              <div class="set-row">
+                <div class="sr-text">
+                  <b>同时下载任务数</b><span>其余任务将在队列中等待</span>
+                </div>
+                <div class="stepper" data-for="set-concurrent">
+                  <button type="button" data-d="-1">−</button
+                  ><input
+                    id="set-concurrent"
+                    type="number"
+                    min="1"
+                    max="10"
+                  /><button type="button" data-d="1">+</button>
+                </div>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-row col">
+                <div class="sr-text">
+                  <b>下载限速</b><span>所有下载任务共享此速度上限</span>
+                </div>
+                <div class="seg" id="set-limits"></div>
+                <label class="custom"
+                  >自定义
+                  <input
+                    id="set-limit-custom"
+                    type="number"
+                    min="0"
+                    step="64"
+                    placeholder="—"
+                  />
+                  KB/s</label
+                >
+              </div>
+            </div>
+          </section>
+          <section data-panel="browser" hidden>
+            <h2>浏览器扩展</h2>
+            <p class="lead">
+              扩展会将浏览器下载交给 BaaDash，并携带 Cookie
+              以下载需要登录的文件，还会为视频添加下载按钮。
+            </p>
+            <div class="ext-status" id="ext-status"></div>
+            <div class="set-group" id="browser-list"></div>
+            <p class="set-note" id="ext-saveas" hidden>
+              浏览器仍询问保存位置？请在浏览器下载设置中关闭
+              <b>下载前询问每个文件的保存位置</b>，只让 BaaDash 询问。
+            </p>
+            <div class="set-group">
+              <label class="set-row"
+                ><div class="sr-text">
+                  <b>自动推荐扩展</b
+                  ><span>支持的浏览器将在下次启动时询问一次</span>
+                </div>
+                <span class="switch"
+                  ><input type="checkbox" id="set-offer" /><i></i></span
+              ></label>
+            </div>
+          </section>
+          <section data-panel="about" hidden>
+            <div class="about">
+              <div class="about-lockup">
+                <img
+                  class="about-brand-icon"
+                  src="brand-icon.svg"
+                  alt="BaaDash"
+                  width="84"
+                  height="84"
+                />
+              </div>
+              <p id="version"></p>
+              <p class="muted">
+                多连接高速下载，随时随地断点续传。<br />免费且开源。
+              </p>
+            </div>
+            <div class="set-group">
+              <div class="set-row">
+                <div class="sr-text">
+                  <b>软件更新</b><span id="update-status">手动检查新版本</span>
+                </div>
+                <button type="button" class="btn sm" id="check-update">
+                  检查更新
+                </button>
+              </div>
+              <div class="set-row">
+                <div class="sr-text">
+                  <b>调试日志</b
+                  ><span
+                    >记录 BaaDash 的运行情况和错误，报告问题时请附上日志。</span
+                  >
+                </div>
+                <button type="button" class="btn sm" id="set-log">
+                  打开日志
+                </button>
+              </div>
+            </div>
+          </section>
+          <div class="set-foot">
+            <button type="button" class="btn" id="set-cancel">取消</button>
+            <button type="submit" class="btn primary">保存</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Confirm -->
+    <!-- Install the extension from the folder BaaDash ships with -->
+    <dialog id="dlg-ext" class="modal guide">
+      <form method="dialog">
+        <h3>添加浏览器扩展</h3>
+        <p class="muted">
+          扩展已随 BaaDash
+          附带。只需四步即可完成安装，连接成功后此窗口会自动提示。
+        </p>
+        <ol class="guide-steps">
+          <li>
+            <span class="step">1</span>
+            <div>
+              <b>打开扩展管理页面</b
+              ><span id="ext-step1"
+                >在地址栏输入 <code>chrome://extensions</code></span
+              ><span class="guide-browsers" id="ext-browsers"></span>
+            </div>
+          </li>
+          <li>
+            <span class="step">2</span>
+            <div>
+              <b>开启开发者模式</b><span>开关位于扩展管理页面右上角</span>
+            </div>
+          </li>
+          <li>
+            <span class="step">3</span>
+            <div>
+              <b>点击“加载已解压的扩展程序”</b
+              ><span>随后会打开文件夹选择窗口</span>
+            </div>
+          </li>
+          <li>
+            <span class="step">4</span>
+            <div>
+              <b>选择 BaaDash 的扩展文件夹</b
+              ><span>路径已复制，可直接粘贴到文件夹选择窗口</span
+              ><span class="guide-path"
+                ><code id="ext-path">…</code
+                ><button
+                  type="button"
+                  class="sq-btn"
+                  id="ext-copy"
+                  title="复制路径"
+                ></button
+              ></span>
+            </div>
+          </li>
+        </ol>
+        <p class="guide-wait" id="ext-wait">正在等待扩展连接…</p>
+        <p class="guide-note">
+          请使用此文件夹，不要另外复制：应用安装期间它会保留在原位，并随 BaaDash
+          一起更新。
+        </p>
+        <p class="guide-note">
+          <b>Firefox：</b>请改为从
+          <a href="#" id="ext-ff-store">Firefox 附加组件商店</a>获取。
+        </p>
+        <div class="confirm-foot">
+          <button value="close" class="btn">完成</button>
+          <button type="button" class="btn primary" id="ext-open">
+            打开扩展文件夹
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="dlg-delete" class="modal confirm">
+      <form method="dialog">
+        <h3 id="del-title">移除下载任务？</h3>
+        <p id="del-text"></p>
+        <label class="check" id="del-files-row"
+          ><input type="checkbox" id="del-files" /><span
+            >同时删除磁盘上的文件</span
+          ></label
+        >
+        <div class="confirm-foot">
+          <button value="cancel" class="btn">取消</button>
+          <button value="ok" class="btn danger" id="del-ok">移除</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="menu" class="menu" hidden></div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

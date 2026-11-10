@@ -1,0 +1,45 @@
+name: 问题反馈
+description: 报告 BaaDash 的异常行为
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么？
+      description: 请说明你预期的行为和实际发生的情况。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开新建下载……
+        2. 粘贴……
+        3. 点击……
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: BaaDash 版本
+      placeholder: "0.3.6"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options: [Windows, macOS, Linux]
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: 浏览器（扩展问题请填写）
+      placeholder: "Chrome 141"
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息
+      description: 可附截图、公开下载链接和日志。请不要粘贴 Cookie、账号、密码或私密链接。

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8" /><title>BaaDash 功能演示</title
+  ><style>
+    @font-face {
+      font-family: SC;
+      src: url(../site/assets/NotoSansSC-Variable.woff2);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    html,
+    body {
+      margin: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: #111216;
+      color: #efeff0;
+      font-family: SC, system-ui, sans-serif;
+    }
+    .scene {
+      position: absolute;
+      inset: 0;
+      padding: 64px 100px;
+      opacity: 0;
+      visibility: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    .logo {
+      width: 740px;
+    }
+    .eyebrow {
+      font-size: 18px;
+      color: #81848e;
+      letter-spacing: 0.18em;
+    }
+    h1 {
+      font-weight: 400;
+      font-size: 58px;
+      margin: 28px 0 18px;
+    }
+    p {
+      font-size: 25px;
+      color: #969aa5;
+      margin: 0;
+    }
+    .shot {
+      max-width: 1440px;
+      max-height: 760px;
+      object-fit: contain;
+      margin-top: 30px;
+      border: 1px solid #ffffff18;
+      border-radius: 16px;
+      box-shadow: 0 30px 90px #0005;
+    }
+    .duo {
+      display: flex;
+      gap: 42px;
+      align-items: center;
+      justify-content: center;
+    }
+    .duo img {
+      max-width: 780px;
+      max-height: 650px;
+      object-fit: contain;
+    }
+    .footer {
+      position: absolute;
+      bottom: 24px;
+      left: 100px;
+      font-size: 15px;
+      color: #696d77;
+    }
+    .title-logo {
+      width: 250px;
+      position: absolute;
+      top: 40px;
+      left: 80px;
+    }
+    .sub {
+      margin-top: 38px;
+      font-size: 21px;
+    }
+    .extension {
+      width: 420px;
+      max-height: 740px;
+      object-fit: contain;
+      margin-top: 22px;
+    }
+    .scene.compact h1 {
+      margin: 0 0 12px;
+    }
+    .scene.compact p {
+      font-size: 22px;
+    }</style
+  ><img class="title-logo" src="../site/assets/logo-wordmark-dark.svg" />
+  <section class="scene" data-a="0" data-b="7">
+    <div class="eyebrow">FREE & OPEN SOURCE</div>
+    <img class="logo" src="../site/assets/logo-wordmark-dark.svg" />
+    <h1>下载继续，浏览照常。</h1>
+    <p>多连接下载 · 断点续传 · 按需出现的浏览器入口</p>
+  </section>
+  <section class="scene compact" data-a="7" data-b="16">
+    <h1>一个列表，整理所有下载。</h1>
+    <p>分类、多选与批量操作。</p>
+    <img class="shot" src="../docs/assets/zh-cn/batch-manage.png" />
+  </section>
+  <section class="scene compact" data-a="16" data-b="25">
+    <h1>能发现资源，也懂得保持安静。</h1>
+    <div class="duo">
+      <img class="extension" src="../docs/assets/zh-cn/extension-dark.png" />
+      <div>
+        <p>嗅探与浮层分别控制</p>
+        <p class="sub">图片按钮默认关闭</p>
+        <p class="sub">视频入口静止自动隐藏</p>
+      </div>
+    </div>
+  </section>
+  <section class="scene compact" data-a="25" data-b="34">
+    <h1>下载前确认，下载中掌控。</h1>
+    <p>文件信息、保存位置与连接进度。</p>
+    <div class="duo">
+      <img src="../docs/assets/zh-cn/download-new.png" /><img
+        src="../docs/assets/zh-cn/download-progress.png"
+      />
+    </div>
+  </section>
+  <section class="scene compact" data-a="34" data-b="42">
+    <h1>深色或浅色，跟随你的习惯。</h1>
+    <img class="shot" src="../docs/assets/zh-cn/main-light.png" />
+  </section>
+  <section class="scene" data-a="42" data-b="48">
+    <img class="logo" src="../site/assets/logo-wordmark-dark.svg" />
+    <h1>把文件交给队列，把屏幕留给内容。</h1>
+    <p>Windows · macOS · Linux</p>
+    <p class="sub">基于 SwiftDL 独立维护 / 本地开发版</p>
+  </section>
+  <div class="footer">
+    当前界面重新渲染 · 任务、资源和速度为模拟数据，不是实际测速
+  </div>
+  <script>
+    window.DURATION = 48;
+    window.ready = Promise.all(
+      [...document.images].map((i) => i.decode()),
+    ).then(() => document.fonts.ready);
+    window.seek = (t) => {
+      for (const e of document.querySelectorAll(".scene")) {
+        const a = +e.dataset.a,
+          b = +e.dataset.b,
+          on = t >= a && t < b;
+        e.style.visibility = on ? "visible" : "hidden";
+        e.style.opacity = on ? Math.min(1, (t - a) * 3, (b - t) * 3) : 0;
+      }
+    };
+    window.seek(1);
+  </script>
+</html>

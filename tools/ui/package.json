@@ -1,0 +1,12 @@
+{
+  "name": "baadash-ui-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node checks.mjs && node background-check.mjs && node site-check.mjs",
+    "screenshots": "node screenshots.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "1.65.0"
+  }
+}
