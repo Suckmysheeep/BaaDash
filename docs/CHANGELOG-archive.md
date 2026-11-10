@@ -69,7 +69,7 @@ BaaDash（原 SwiftDLCN）的重要变更记录于此。格式参考 [Keep a Cha
 
 ### 调整
 
-- 项目仓库、扩展下载链接与更新检查统一指向 `Suckmysheeep/SwiftDLCN`。
+- 项目仓库、扩展下载链接与更新检查统一指向当时的中文分支仓库（已归档停用）。
 - 新下载按“视频、音乐、程序、压缩文件、文档、图片”整理到中文分类目录。
 - 文件名保留中文及其他 Unicode 字符，清理 Windows 非法字符、保留设备名和过长名称。
 - 同名文件自动使用全角中文编号，例如 `奶龙（1）.mp4`。
@@ -338,10 +338,6 @@ BaaDash（原 SwiftDLCN）的重要变更记录于此。格式参考 [Keep a Cha
 - GitHub Actions for CI and tagged releases (Windows, macOS, Linux and the
   extension zip).
 
-[Unreleased]: https://github.com/Suckmysheeep/SwiftDLCN/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/Suckmysheeep/SwiftDLCN/compare/v0.3.7...v0.4.0
-[0.3.7]: https://github.com/Suckmysheeep/SwiftDLCN/releases/tag/v0.3.7
-[0.3.6]: https://github.com/Suckmysheeep/SwiftDLCN/releases/tag/v0.3.6
 [0.3.5]: https://github.com/harshsinghsv/swiftdl/compare/v0.3.3...v0.3.5
 [0.3.3]: https://github.com/harshsinghsv/swiftdl/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/harshsinghsv/swiftdl/compare/v0.3.1...v0.3.2
