@@ -1921,6 +1921,7 @@ $("update").addEventListener("click", async (e) => {
 async function boot() {
   hydrate();
   const s = await invoke("get_state");
+  listen("settings", (e) => { state.settings = e.payload; render(); });
   state.settings = s.settings;
   document.documentElement.style.zoom = String((s.settings.interfaceScale || 100) / 100);
   window.setTheme(s.settings.theme);
@@ -2058,13 +2059,7 @@ function askBulk(ids: number[], historyOnly = false) {
   dlg.showModal();
 }
 
-const checksumLabel = document.createElement("label");
-checksumLabel.textContent = "SHA-256（可选）";
-const checksumInput = document.createElement("input");
-checksumInput.id = "add-checksum"; checksumInput.maxLength = 64; checksumInput.placeholder = "下载后校验文件";
-checksumLabel.append(checksumInput);
-$("add-filename").parentElement!.after(checksumLabel);
-$("dlg-add").addEventListener("close", () => { checksumInput.value = ""; });
+$("dlg-add").addEventListener("close", () => { $("add-checksum").value = ""; });
 let lastClipboard = "";
 window.addEventListener("focus", async () => {
   if (!settings().clipboardWatch || document.querySelector("dialog[open]")) return;

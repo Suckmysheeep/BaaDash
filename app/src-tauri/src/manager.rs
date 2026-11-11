@@ -683,17 +683,18 @@ impl DownloadManager {
                     Kind::File => swiftdl_engine::run(&this.client, &req, progress, cancel, this.limiter.clone()).await,
                 };
                 let result = this.verify(id, result, &note).await;
+                let mut gif_path = None;
                 let result = match (result, gif) {
                     (Ok(Outcome::Completed), Some(options)) => match crate::gif::convert(&this.client, &note, &req.dest, options).await {
                         Ok(path) => {
-                            this.record_gif(id, path);
+                            gif_path = Some(path);
                             Ok(Outcome::Completed)
                         },
                         Err(error) => Err(error),
                     },
                     (result, _) => result,
                 };
-                this.finish(id, result);
+                this.finish(id, result, gif_path);
             });
         }
         self.changed();
@@ -726,8 +727,8 @@ impl DownloadManager {
             self.app.exit(0);
             return;
         }
-        let body = if kind == "sleep" { "Going to sleep in a few seconds." } else { "Shutting down in 60 seconds. To cancel, run: shutdown /a" };
-        let _ = self.app.notification().builder().title("Downloads finished").body(body).show();
+        let body = if kind == "sleep" { "即将进入休眠。" } else { "即将关机。Windows 可在 60 秒内运行 shutdown /a 取消。" };
+        let _ = self.app.notification().builder().title("下载全部完成").body(body).show();
         let kind = kind.to_string();
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_secs(5));
@@ -779,7 +780,7 @@ impl DownloadManager {
         g.dirty = true;
     }
 
-    fn finish(self: &Arc<Self>, id: u64, result: Result<Outcome>) {
+    fn finish(self: &Arc<Self>, id: u64, result: Result<Outcome>, gif_path: Option<PathBuf>) {
         let mut notify = None;
         {
             let mut g = self.inner.lock().unwrap();
@@ -828,6 +829,10 @@ impl DownloadManager {
                 }
             }
         }
+        if let Some(path) = gif_path {
+            if notify.is_some() { notify = path.file_name().map(|n| n.to_string_lossy().into_owned()); }
+            self.record_gif(id, path);
+        }
         let action = {
             let mut g = self.inner.lock().unwrap();
             if g.running.is_empty() && !g.items.is_empty() && g.items.iter().all(|i| i.status == Status::Completed) {
@@ -841,7 +846,10 @@ impl DownloadManager {
         self.changed();
         self.save();
         self.schedule();
-        if ["close", "sleep", "shutdown"].contains(&action.as_str()) { self.power(&action); }
+        if ["close", "sleep", "shutdown"].contains(&action.as_str()) {
+            let _ = self.app.emit("settings", self.settings());
+            self.power(&action);
+        }
     }
 
     /// Called every 500 ms: copies live progress into items, computes
@@ -899,6 +907,20 @@ impl DownloadManager {
         match saved {Ok(())=>{WARNED.store(false,Ordering::Relaxed);},Err(e)=>{crate::log::line(&format!("could not save application state: {e:#}"));if !WARNED.swap(true,Ordering::Relaxed){let _=self.app.emit("storage-error",format!("无法保存任务与设置，请检查磁盘空间及目录权限：{e}"));}}}
     }
 
+    fn check_start_time(self: &Arc<Self>) {
+        let due = {
+            let mut g = self.inner.lock().unwrap();
+            if g.settings.start_at.is_some_and(|at| at <= now_ms()) {
+                g.settings.start_at = None;
+                true
+            } else { false }
+        };
+        if due {
+            let _ = self.app.emit("settings", self.settings());
+            self.save(); self.schedule();
+        }
+    }
+
     pub fn start_ticker(self: &Arc<Self>) {
         let this = self.clone();
         tauri::async_runtime::spawn(async move {
@@ -906,7 +928,7 @@ impl DownloadManager {
             for n in 0u64.. {
                 tick.tick().await;
                 this.tick(n);
-                this.schedule();
+                this.check_start_time();
             }
         });
         self.schedule();
