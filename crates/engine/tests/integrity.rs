@@ -27,7 +27,11 @@ impl Fixture {
     }
 }
 impl Drop for Fixture { fn drop(&mut self){self.stop.store(true,Ordering::Relaxed);if let Some(w)=self.worker.take(){w.join().unwrap();}} }
-fn folder()->PathBuf {let p=std::env::temp_dir().join(format!("baadash-integrity-{}",SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));fs::create_dir_all(&p).unwrap();p}
+fn folder()->PathBuf {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let p=std::env::temp_dir().join(format!("baadash-integrity-{}-{}-{}",std::process::id(),SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos(),NEXT.fetch_add(1,Ordering::Relaxed)));
+    fs::create_dir(&p).unwrap();p
+}
 async fn download(f:&Fixture,dest:PathBuf)->anyhow::Result<Outcome>{run(&build_client()?,&Request{url:f.url.clone(),dest,connections:4,headers:HeaderMap::new(),restart:false},Arc::new(Progress::default()),CancellationToken::new(),Arc::new(SpeedLimiter::new(0))).await}
 #[tokio::test]
 async fn truncated_resume_file_is_restarted_and_bytes_match(){
@@ -39,5 +43,7 @@ async fn truncated_resume_file_is_restarted_and_bytes_match(){
 #[tokio::test]
 async fn existing_destination_is_preserved(){
     let f=Fixture::new();let dir=folder();let dest=dir.join("file.bin");fs::write(&dest,b"keep me").unwrap();
-    assert!(download(&f,dest.clone()).await.is_err());assert_eq!(fs::read(&dest).unwrap(),b"keep me");assert!(dir.join("file.bin.part").exists());fs::remove_dir_all(dir).unwrap();
+    let error=download(&f,dest.clone()).await.unwrap_err();
+    assert!(format!("{error:#}").contains("目标文件已经存在"), "{error:#}");
+    assert_eq!(fs::read(&dest).unwrap(),b"keep me");assert!(dir.join("file.bin.part").exists());fs::remove_dir_all(dir).unwrap();
 }

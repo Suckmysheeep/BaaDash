@@ -1,3 +1,11 @@
+function pickStream(items) {
+  const streams = items.filter((m) => m.kind === "hls" || m.kind === "dash");
+  const main = streams.find((m) => m.qualities?.length > 1) || streams.find((m) => m.qualities?.length);
+  if (main || !streams.length) return main || null;
+  return streams.filter((m) => streams[0].at - m.at < 60000).at(-1);
+}
+
+
 const DEFAULTS = {
   enabled: true,
   sniffing: true,
@@ -104,7 +112,7 @@ async function main() {
   });
   const files = items.filter((m) => m.kind === "file");
   // The oldest stream is the player's main playlist, with every quality.
-  const stream = items.filter((m) => m.kind !== "file").at(-1);
+  const stream = pickStream(items);
   const title = cleanName(tab.title);
   const ext = (m) =>
     (/\.([a-z0-9]{2,4})(?:$|[?#])/i.exec(new URL(m.url).pathname) ||

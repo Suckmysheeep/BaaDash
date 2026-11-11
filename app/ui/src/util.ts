@@ -79,7 +79,15 @@ export function catOf(name: string | null | undefined): string {
 export function extractLinks(text: string | null | undefined): string[] {
   const matches = String(text || "").match(/(?:https?:\/\/|magnet:\?)[^\s<>"'“”‘’，。；！？、】）]+/gi) || [];
   const cleaned = matches.map((url) => url.replace(/[\]\[.,!?;:，。；！？、）】]+$/g, "")).filter(Boolean);
-  return [...new Set(cleaned)];
+  const expanded: string[] = [];
+  for (const url of cleaned) {
+    const m = /\[(\d{1,6})-(\d{1,6})\]/.exec(url);
+    if (!m) { expanded.push(url); continue; }
+    const start = Number(m[1]), end = Number(m[2]);
+    if (end < start || end - start >= 500) continue;
+    for (let n = start; n <= end && expanded.length < 500; n++) expanded.push(url.replace(m[0], String(n).padStart(m[1].length, "0")));
+  }
+  return [...new Set(expanded)].slice(0, 500);
 }
 export const firstUrl = (text: string | null | undefined): string | undefined => extractLinks(text)[0];
 
@@ -139,6 +147,8 @@ export function when(ms: number | null | undefined): string {
 export function displayText(value: unknown): string {
   const text = String(value ?? "");
   const exact: Record<string, string> = {
+    "This link opens a web page, not a file. The site may need you to sign in or confirm first.": "链接返回的是网页，可能需要先登录或确认下载。",
+    "Checking the file": "正在校验文件",
     "Audio only": "仅音频", "Best quality": "最佳画质", "Original": "原始画质",
     "Getting yt-dlp": "正在获取 yt-dlp", "Getting ffmpeg": "正在获取 ffmpeg",
     "Unpacking ffmpeg": "正在解压 ffmpeg", "Getting video details": "正在获取视频信息",

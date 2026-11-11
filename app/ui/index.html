@@ -194,6 +194,7 @@
           </div>
         </div>
         <div class="comp-state" id="add-state"></div>
+<label class="comp-checksum" for="add-checksum">SHA-256（可选）<input id="add-checksum" maxlength="64" placeholder="输入文件发布者提供的校验值" autocomplete="off" spellcheck="false"></label>
         <div class="chips" id="add-chips"></div>
         <div class="comp-foot">
           <button type="button" class="ghost-btn" id="add-paste">
@@ -361,6 +362,12 @@
             </div>
           </section>
           <section data-panel="speed" hidden>
+<div class="set-group"><div class="set-row extra-setting"><label for="set-proxy">下载代理（重启后生效）</label><input id="set-proxy" placeholder="留空跟随系统；http:// 或 socks5h://"></div>
+<div class="set-row extra-setting"><label for="set-bind">本地网络 IP（重启后生效）</label><input id="set-bind" placeholder="留空自动选择"></div>
+<div class="set-row extra-setting"><label for="set-scale">界面大小（90–150%）</label><input id="set-scale" type="number" min="90" max="150" step="10"></div>
+<div class="set-row extra-setting"><label><input id="set-clipboard" type="checkbox">切回应用时检测剪贴板下载链接</label></div>
+<div class="set-row extra-setting"><label for="set-start-at">队列开始时间（留空立即）</label><input id="set-start-at" type="datetime-local"></div>
+<div class="set-row extra-setting"><label for="set-finished">全部成功完成后（仅执行一次）</label><select id="set-finished"><option value="">不操作</option><option value="close">退出 BaaDash</option><option value="sleep">休眠</option><option value="shutdown">关机</option></select></div></div>
             <h2>下载速度</h2>
             <div class="set-group">
               <div class="set-row">

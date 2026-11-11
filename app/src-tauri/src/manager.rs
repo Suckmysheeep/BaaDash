@@ -7,7 +7,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use swiftdl_engine::header::{HeaderMap, HeaderName, HeaderValue};
@@ -27,6 +27,10 @@ pub enum Status {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Item {
+    #[serde(default)]
+    pub checksum: Option<String>,
+    #[serde(default)]
+    pub verified: bool,
     pub id: u64,
     pub url: String,
     pub filename: String,
@@ -152,6 +156,8 @@ impl Incoming {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddRequest {
+    #[serde(default)]
+    pub checksum: Option<String>,
     pub url: String,
     pub filename: String,
     pub dir: PathBuf,
@@ -207,6 +213,7 @@ pub struct DownloadManager {
     app: AppHandle,
     client: Client,
     limiter: Arc<SpeedLimiter>,
+    ignore_limit: AtomicBool,
     data_dir: PathBuf,
     inner: Mutex<Inner>,
 }
@@ -228,11 +235,14 @@ impl DownloadManager {
                 item.remaining = swiftdl_engine::saved_remaining(&item.path).unwrap_or_default();
             }
         }
+        crate::media::set_proxy(&settings.proxy);
+        crate::media::set_bind(&settings.bind_address);
         let next_id = items.iter().map(|i| i.id).max().unwrap_or(0) + 1;
         Ok(Arc::new(Self {
             app,
-            client: swiftdl_engine::build_client()?,
+            client: swiftdl_engine::build_client_opts(&settings.proxy, &settings.bind_address)?,
             limiter: Arc::new(SpeedLimiter::new(settings.speed_limit_kib * 1024)),
+            ignore_limit: AtomicBool::new(false),
             data_dir,
             inner: Mutex::new(Inner {
                 items,
@@ -291,6 +301,8 @@ impl DownloadManager {
             let id = g.next_id;
             g.next_id += 1;
             g.items.push(Item {
+                checksum: req.checksum,
+                verified: false,
                 id,
                 url: req.url,
                 filename: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or(filename.clone()),
@@ -323,6 +335,48 @@ impl DownloadManager {
         self.changed();
         self.schedule();
         id
+    }
+
+    pub fn download_next(self: &Arc<Self>, id: u64) -> Result<(), String> {
+        {
+            let mut g = self.inner.lock().unwrap();
+            let index = g.items.iter().position(|i| i.id == id && i.status == Status::Queued).ok_or("任务不在等待队列中")?;
+            let item = g.items.remove(index);
+            g.items.insert(0, item);
+            g.dirty = true;
+        }
+        self.save(); self.schedule(); Ok(())
+    }
+
+    pub fn replace_url(self: &Arc<Self>, id: u64, url: String) -> Result<(), String> {
+        let parsed = url::Url::parse(url.trim()).map_err(|_| "链接无效")?;
+        if !["http", "https"].contains(&parsed.scheme()) { return Err("仅支持 HTTP/HTTPS 链接".into()); }
+        {
+            let mut g = self.inner.lock().unwrap();
+            if g.running.contains_key(&id) { return Err("请先等待任务暂停".into()); }
+            let item = g.items.iter_mut().find(|i| i.id == id).ok_or("找不到任务")?;
+            if !matches!(item.status, Status::Paused | Status::Error) || item.format.is_some() || item.torrent_files.is_some() { return Err("仅支持暂停或失败的普通文件任务".into()); }
+            // Rebase only the address. Existing validators and range checks stay mandatory.
+            let mut state_name = item.path.as_os_str().to_os_string();
+            state_name.push(".swiftdl");
+            let state_path = PathBuf::from(state_name);
+            if state_path.exists() {
+                let raw = std::fs::read(&state_path).map_err(|e| e.to_string())?;
+                let mut saved: serde_json::Value = serde_json::from_slice(&raw).map_err(|e| e.to_string())?;
+                saved["url"] = serde_json::Value::String(parsed.to_string());
+                let tmp = state_path.with_extension("swiftdl.tmp");
+                std::fs::write(&tmp, serde_json::to_vec(&saved).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+                std::fs::rename(tmp, state_path).map_err(|e| e.to_string())?;
+            }
+            item.url = parsed.to_string(); item.error = None;
+        }
+        self.resume(&[id]); Ok(())
+    }
+
+    pub fn toggle_limit(&self) {
+        let limit = self.settings().speed_limit_kib * 1024;
+        let ignored = !self.ignore_limit.fetch_xor(true, Ordering::Relaxed);
+        self.limiter.set_rate(if ignored { 0 } else { limit });
     }
 
     pub fn pause(self: &Arc<Self>, ids: &[u64]) {
@@ -394,7 +448,9 @@ impl DownloadManager {
     }
 
     pub fn set_settings(self: &Arc<Self>, settings: Settings) {
-        self.limiter.set_rate(settings.speed_limit_kib * 1024);
+        crate::media::set_proxy(&settings.proxy);
+        crate::media::set_bind(&settings.bind_address);
+        self.limiter.set_rate(if self.ignore_limit.load(Ordering::Relaxed) { 0 } else { settings.speed_limit_kib * 1024 });
         if let Err(e) = crate::browser::offer_extension(settings.offer_extension) {
             crate::log::line(&format!("could not update browser extension offer: {e:#}"));
         }
@@ -431,7 +487,7 @@ impl DownloadManager {
             let probed = swiftdl_engine::probe(&this.client, &inc.url, &to_header_map(&headers)).await.ok().map(|r| r.filename);
             let filename = inc.suggested_name().or(probed).unwrap_or_else(|| "download.bin".into());
             let dir = this.default_dir(category_for(&filename));
-            this.add(AddRequest { url: inc.url, filename, dir, headers, start: true, window: None, format: None, size: None, torrent_files: None, background: false, convert_gif: false, gif_options: None });
+            this.add(AddRequest { checksum: None, url: inc.url, filename, dir, headers, start: true, window: None, format: None, size: None, torrent_files: None, background: false, convert_gif: false, gif_options: None });
         });
     }
 
@@ -470,7 +526,7 @@ impl DownloadManager {
             while let Some(Ok((inc, headers, probed, media))) = jobs.join_next().await {
                 let filename = probed.unwrap_or_else(|| "download.bin".into());
                 let dir = this.default_dir(category_for(&filename));
-                this.add(AddRequest {
+                this.add(AddRequest { checksum: None,
                     url: inc.url,
                     filename,
                     dir,
@@ -551,6 +607,7 @@ impl DownloadManager {
         let to_start: Vec<(u64, Request, Kind, Arc<Progress>, crate::media::Note, CancellationToken, Option<crate::gif::GifOptions>)> = {
             let mut g = self.inner.lock().unwrap();
             let Inner { items, running, settings, .. } = &mut *g;
+            if settings.start_at.is_some_and(|at| at > now_ms()) { return; }
             let free = settings.max_concurrent.max(1).saturating_sub(running.len());
             let connections = settings.connections;
             items
@@ -627,21 +684,107 @@ impl DownloadManager {
                     }
                     Kind::File => swiftdl_engine::run(&this.client, &req, progress, cancel, this.limiter.clone()).await,
                 };
+                let result = this.verify(id, result, &note).await;
+                let mut gif_path = None;
                 let result = match (result, gif) {
                     (Ok(Outcome::Completed), Some(options)) => match crate::gif::convert(&this.client, &note, &req.dest, options).await {
-                        Ok(_) => Ok(Outcome::Completed),
+                        Ok(path) => {
+                            gif_path = Some(path);
+                            Ok(Outcome::Completed)
+                        },
                         Err(error) => Err(error),
                     },
                     (result, _) => result,
                 };
-                this.finish(id, result);
+                this.finish(id, result, gif_path);
             });
         }
         self.changed();
     }
 
-    fn finish(self: &Arc<Self>, id: u64, result: Result<Outcome>) {
+    /// Checks a finished file against the SHA-256 the user gave, if any.
+    async fn verify(self: &Arc<Self>, id: u64, result: Result<Outcome>, note: &crate::media::Note) -> Result<Outcome> {
+        if !matches!(result, Ok(Outcome::Completed)) {
+            return result;
+        }
+        let Some((want, path)) = self.item(id).and_then(|i| i.checksum.clone().map(|c| (c, i.path.clone()))) else { return result };
+        *note.lock().unwrap() = Some("Checking the file".into());
+        match tauri::async_runtime::spawn_blocking(move || sha256_file(&path)).await {
+            Ok(Ok(got)) if got.eq_ignore_ascii_case(want.trim()) => {
+                if let Some(i) = self.inner.lock().unwrap().items.iter_mut().find(|i| i.id == id) {
+                    i.verified = true;
+                }
+                result
+            }
+            Ok(Ok(got)) => Err(anyhow::anyhow!("The file's SHA-256 doesn't match. Expected {}, got {got}. It may be corrupted or not the file you meant.", want.trim())),
+            _ => Err(anyhow::anyhow!("The file finished, but couldn't be read to check it.")),
+        }
+    }
+
+    /// Quit, sleep or shut down, with a notice first.
+    fn power(&self, kind: &str) {
+        use tauri_plugin_notification::NotificationExt;
+        crate::log::line(&format!("all downloads finished: {kind}"));
+        if kind == "close" {
+            self.app.exit(0);
+            return;
+        }
+        let body = if kind == "sleep" { "即将进入休眠。" } else { "即将关机。Windows 可在 60 秒内运行 shutdown /a 取消。" };
+        let _ = self.app.notification().builder().title("下载全部完成").body(body).show();
+        let kind = kind.to_string();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_secs(5));
+            let mut cmd;
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd = if kind == "sleep" {
+                    let mut c = std::process::Command::new("rundll32.exe");
+                    c.args(["powrprof.dll,SetSuspendState", "0,1,0"]);
+                    c
+                } else {
+                    let mut c = std::process::Command::new("shutdown");
+                    c.args(["/s", "/t", "60"]);
+                    c
+                };
+                cmd.creation_flags(0x0800_0000);
+            }
+            #[cfg(target_os = "macos")]
+            {
+                cmd = if kind == "sleep" {
+                    let mut c = std::process::Command::new("pmset");
+                    c.arg("sleepnow");
+                    c
+                } else {
+                    let mut c = std::process::Command::new("osascript");
+                    c.args(["-e", "tell app \"System Events\" to shut down"]);
+                    c
+                };
+            }
+            #[cfg(all(unix, not(target_os = "macos")))]
+            {
+                cmd = std::process::Command::new("systemctl");
+                cmd.arg(if kind == "sleep" { "suspend" } else { "poweroff" });
+            }
+            if let Err(e) = cmd.spawn() {
+                crate::log::line(&format!("could not {kind}: {e}"));
+            }
+        });
+    }
+
+    fn record_gif(&self, source_id: u64, path: PathBuf) {
+        let mut g = self.inner.lock().unwrap();
+        let Some(source) = g.items.iter().find(|i| i.id == source_id).cloned() else { return };
+        if g.items.iter().any(|i| i.path == path) { return; }
+        let output = completed_gif(&source, g.next_id, path);
+        g.next_id += 1;
+        g.items.push(output);
+        g.dirty = true;
+    }
+
+    fn finish(self: &Arc<Self>, id: u64, result: Result<Outcome>, gif_path: Option<PathBuf>) {
         let mut notify = None;
+        let mut completed = false;
         {
             let mut g = self.inner.lock().unwrap();
             let running = g.running.remove(&id);
@@ -669,6 +812,7 @@ impl DownloadManager {
                     item.note = None;
                     match result {
                         Ok(Outcome::Completed) => {
+                            completed = true;
                             item.status = Status::Completed;
                             item.completed_at = Some(now_ms());
                             item.size = item.size.or(Some(item.downloaded));
@@ -689,6 +833,16 @@ impl DownloadManager {
                 }
             }
         }
+        if let Some(path) = gif_path {
+            if notify.is_some() { notify = path.file_name().map(|n| n.to_string_lossy().into_owned()); }
+            self.record_gif(id, path);
+        }
+        let action = {
+            let mut g = self.inner.lock().unwrap();
+            if completed && g.running.is_empty() && !g.items.is_empty() && g.items.iter().all(|i| i.status == Status::Completed) {
+                std::mem::take(&mut g.settings.when_finished)
+            } else { String::new() }
+        };
         if let Some(name) = notify {
             use tauri_plugin_notification::NotificationExt;
             let _ = self.app.notification().builder().title("下载完成").body(name).show();
@@ -696,6 +850,10 @@ impl DownloadManager {
         self.changed();
         self.save();
         self.schedule();
+        if ["close", "sleep", "shutdown"].contains(&action.as_str()) {
+            let _ = self.app.emit("settings", self.settings());
+            self.power(&action);
+        }
     }
 
     /// Called every 500 ms: copies live progress into items, computes
@@ -753,6 +911,20 @@ impl DownloadManager {
         match saved {Ok(())=>{WARNED.store(false,Ordering::Relaxed);},Err(e)=>{crate::log::line(&format!("could not save application state: {e:#}"));if !WARNED.swap(true,Ordering::Relaxed){let _=self.app.emit("storage-error",format!("无法保存任务与设置，请检查磁盘空间及目录权限：{e}"));}}}
     }
 
+    fn check_start_time(self: &Arc<Self>) {
+        let due = {
+            let mut g = self.inner.lock().unwrap();
+            if g.settings.start_at.is_some_and(|at| at <= now_ms()) {
+                g.settings.start_at = None;
+                true
+            } else { false }
+        };
+        if due {
+            let _ = self.app.emit("settings", self.settings());
+            self.save(); self.schedule();
+        }
+    }
+
     pub fn start_ticker(self: &Arc<Self>) {
         let this = self.clone();
         tauri::async_runtime::spawn(async move {
@@ -760,6 +932,7 @@ impl DownloadManager {
             for n in 0u64.. {
                 tick.tick().await;
                 this.tick(n);
+                this.check_start_time();
             }
         });
         self.schedule();
@@ -842,5 +1015,87 @@ mod tests {
         assert_eq!(name.chars().count(), 160);
         assert!(name.ends_with(".mp4"));
         assert!(!name.contains("mp4.mp4"));
+    }
+}
+
+fn sha256_file(path: &Path) -> std::io::Result<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut hash = Sha256::new();
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hash.update(&buf[..n]);
+    }
+    Ok(hash.finalize().iter().map(|b| format!("{b:02x}")).collect())
+}
+
+
+fn completed_gif(source: &Item, id: u64, path: PathBuf) -> Item {
+        let mut output = source.clone();
+        output.checksum = None;
+        output.verified = false;
+        output.id = id;
+        output.filename = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+        output.size = std::fs::metadata(&path).ok().map(|m| m.len());
+        output.downloaded = output.size.unwrap_or(0);
+        output.path = path;
+        output.category = "Images".into();
+        output.status = Status::Completed;
+        output.completed_at = Some(now_ms());
+        output.error = None;
+        output.note = None;
+        output.headers.clear();
+        output.remaining.clear();
+        output.segments.clear();
+        output.connections = 0;
+        output.speed = 0.0;
+        output.resumable = false;
+        output.format = None;
+        output.torrent_files = None;
+        output.convert_gif = false;
+        output.gif_options = None;
+    output
+}
+
+#[cfg(test)]
+mod output_tests {
+    use super::*;
+    #[test]
+    fn gif_history_has_its_own_persistent_path_and_size() {
+        let dir = std::env::temp_dir().join(format!("baadash-gif-history-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("动画（1）.gif");
+        std::fs::write(&path, b"GIF89a").unwrap();
+        let source: Item = serde_json::from_value(serde_json::json!({
+            "id":1,"url":"https://example.test/video.mp4","filename":"动画.mp4","path":dir.join("动画.mp4"),
+            "size":1000,"downloaded":1000,"status":"downloading","error":null,"category":"Video",
+            "addedAt":1,"completedAt":null,"resumable":true,"convertGif":true,"headers":[["Cookie","secret"]]
+        })).unwrap();
+        let output = completed_gif(&source, 2, path.clone());
+        assert_eq!(output.status, Status::Completed);
+        assert_eq!(output.filename, "动画（1）.gif");
+        assert_eq!(output.size, Some(6));
+        assert_eq!(output.downloaded, 6);
+        assert_eq!(output.category, "Images");
+        assert!(output.headers.is_empty());
+        assert!(!output.convert_gif);
+        assert!(source.convert_gif);
+        assert_ne!(source.path, output.path);
+        let restored: Item = serde_json::from_slice(&serde_json::to_vec(&output).unwrap()).unwrap();
+        assert_eq!(restored.path, path);
+        assert_eq!(restored.id, 2);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn sha256_reads_the_actual_file() {
+        let path = std::env::temp_dir().join(format!("baadash-sha-{}",std::process::id()));
+        std::fs::write(&path,b"abc").unwrap();
+        assert_eq!(sha256_file(&path).unwrap(),"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        std::fs::remove_file(path).unwrap();
     }
 }

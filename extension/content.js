@@ -1,3 +1,11 @@
+function pickStream(items) {
+  const streams = items.filter((m) => m.kind === "hls" || m.kind === "dash");
+  const main = streams.find((m) => m.qualities?.length > 1) || streams.find((m) => m.qualities?.length);
+  if (main || !streams.length) return main || null;
+  return streams.filter((m) => streams[0].at - m.at < 60000).at(-1);
+}
+
+
 // BaaDash page helper.
 // - Shows a "Download video" button over video players. Clicking it lists
 //   the media files the page loaded and sends the chosen one to BaaDash.
@@ -287,9 +295,7 @@
     }
     // Any site: if the player loaded a stream (HLS or DASH), list its
     // qualities now. The oldest one is the main playlist with every quality.
-    const hls = (res?.items || [])
-      .filter((m) => m.kind === "hls" || m.kind === "dash")
-      .at(-1);
+    const hls = pickStream(res?.items || []);
     if (hls?.qualities?.length) {
       qualityMenu(hls.url, title(), hls.qualities);
       return;
@@ -320,7 +326,7 @@
     const files = items.filter((m) => m.kind === "file");
     // A player loads its main playlist first, then one per quality: the
     // oldest stream is the main one, which lets SwiftDL offer every quality.
-    const stream = items.filter((m) => m.kind !== "file").at(-1);
+    const stream = pickStream(items);
     const name = title();
     let html = "";
     if (files.length) {
@@ -538,9 +544,7 @@
         (source && direct.test(source)
           ? { url: source, mime: "video/mp4" }
           : files[0]);
-      const stream = (res?.items || [])
-        .filter((m) => m.kind === "hls" || m.kind === "dash")
-        .at(-1);
+      const stream = pickStream(res?.items || []);
       // A blob: URL is only the player's local wrapper. Use the captured
       // stream, or the actual X/Twitter status URL, and let the app resolve it.
       const target =

@@ -455,3 +455,31 @@ mod tests {
         assert_eq!(found, vec![root.join("BraveSoftware/Brave-Browser"), root.join("net.imput.helium")]);
     }
 }
+
+
+/// A path suitable for display and pasting into a browser's folder picker.
+pub fn display_path(path: &std::path::Path) -> String {
+    let text = path.to_string_lossy();
+    if let Some(unc) = text.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{}", unc)
+    } else if let Some(drive) = text.strip_prefix(r"\\?\").filter(|p| p.as_bytes().get(1) == Some(&b':')) {
+        drive.to_string()
+    } else {
+        text.into_owned()
+    }
+}
+
+#[cfg(test)]
+mod display_path_tests {
+    use super::display_path;
+    use std::path::Path;
+    #[test]
+    fn formats_drive_unc_and_normal_paths() {
+        for (input, expected) in [
+            (r"\\?\E:\BaaDash\extension", r"E:\BaaDash\extension"),
+            (r"\\?\UNC\server\share\extension", r"\\server\share\extension"),
+            (r"E:\中文\extension", r"E:\中文\extension"),
+            ("/opt/BaaDash/extension", "/opt/BaaDash/extension"),
+        ] { assert_eq!(display_path(Path::new(input)), expected); }
+    }
+}

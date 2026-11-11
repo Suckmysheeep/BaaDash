@@ -11,6 +11,8 @@ export type Status =
 export type Header = [string, string];
 
 export interface Item {
+  checksum?: string | null;
+  verified?: boolean;
   id: number;
   url: string;
   filename: string;
@@ -37,6 +39,12 @@ export interface Item {
 }
 
 export interface Settings {
+  proxy?: string;
+  bindAddress?: string;
+  interfaceScale?: number;
+  clipboardWatch?: boolean;
+  startAt?: number | null;
+  whenFinished?: string;
   downloadDir: string;
   connections: number;
   maxConcurrent: number;
@@ -112,6 +120,7 @@ export interface TorrentInfo {
   files: { path: string; size: number }[];
 }
 export interface AddRequest {
+  checksum?: string | null;
   url: string;
   filename: string;
   dir: string;
@@ -126,6 +135,8 @@ export interface AddRequest {
 type Ids = { ids: number[] };
 type Browser = { browser: string };
 export interface Commands {
+  download_next: [{ id: number }, void];
+  replace_url: [{ id: number; url: string }, void];
   get_state: [void, AppState];
   probe_url: [{ url: string; headers: Header[] }, ProbeInfo];
   probe_media: [{ url: string; headers: Header[] }, MediaInfo];

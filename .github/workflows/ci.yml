@@ -28,6 +28,11 @@ jobs:
         run: npm ci && npm run build
       - run: cargo test --workspace
       - run: cargo build -p swiftdl-app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resolved-lockfile
+          path: Cargo.lock
+          retention-days: 3
 
   # The app has macOS-only code (opening magnet links and .torrent files);
   # make sure it compiles there too.

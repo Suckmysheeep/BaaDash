@@ -2424,3 +2424,10 @@ code {
   flex: none;
   transform: none;
 }
+
+.extra-setting { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.extra-setting > label { min-width:200px; flex:1; }
+.extra-setting > input, .extra-setting > select { width:260px; max-width:100%; }
+
+.comp-checksum { display:flex; gap:12px; align-items:center; padding:8px 20px; color:var(--muted); font-size:12px; }
+.comp-checksum input { flex:1; min-width:0; font-size:12px; }
