@@ -151,7 +151,11 @@ Firefox 需要 140 及以上版本（扩展使用 `data_collection_permissions` 
 
 <img src="docs/assets/zh-cn/command-palette.png" width="1120" alt="命令面板搜索演示任务">
 
-<img src="docs/assets/zh-cn/settings-general.png" width="1120" alt="主题与常规设置">
+<img src="docs/assets/zh-cn/settings-general.png" width="1120" alt="常规设置：通知、托盘和剪贴板">
+
+<img src="docs/assets/zh-cn/settings-appearance.png" width="1120" alt="外观设置：主题与界面缩放">
+
+<img src="docs/assets/zh-cn/settings-network.png" width="1120" alt="网络设置：系统代理与高级选项">
 
 <img src="docs/assets/zh-cn/settings-about.png" width="1120" alt="关于页及检查更新入口">
 

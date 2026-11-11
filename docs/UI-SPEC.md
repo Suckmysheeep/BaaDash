@@ -26,6 +26,7 @@ SHA-256 属于单个下载任务，不属于全局设置。两个新建下载入
 - 图标只辅助识别；按钮必须有可理解的文字或可访问名称。图片图标设置空 alt/aria-hidden，禁止重复朗读。
 - 单色适配使用 currentColor 实色轮廓和 9–20% 次级填充，去除阴影，重要符号不可依赖浅色填充识别；展开/收起采用清晰的几何控件符号。默认静态，不让密集列表同时播放动效；未来动效须响应 prefers-reduced-motion。
 - 保留 `public/icons/kubai/LICENSE`，新增图标时更新映射和来源说明。
+- 新增图标先放入该目录、更新 `tools/ui/icon-map.json`，再运行 `node tools/ui/build-icons.mjs`。生成后的 `icons.ts` 随提交保存；生产构建检查生成结果，禁止手工修改生成文件。
 
 ## 表单与布局
 

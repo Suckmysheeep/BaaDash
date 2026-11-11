@@ -76,11 +76,16 @@ try {
   await p.locator("#bulk-all").check();
   await shot(p, "docs/assets/zh-cn/batch-manage.png");
   await p.locator("#bulk-exit").click();
-  for (const tab of ["general", "browser", "about"]) {
+  for (const tab of ["general", "appearance", "downloads", "network", "automation", "browser", "about"]) {
     await p.locator("#btn-settings").click();
     await p.locator(`[data-tab="${tab}"]`).click();
     await p.evaluate(() => window.setTheme("light"));
     await shot(p, `docs/assets/zh-cn/settings-${tab}.png`);
+    if (["appearance", "network", "automation"].includes(tab)) {
+      const dest = `site/assets/gallery/settings-${tab}.png`;
+      fs.copyFileSync(path.join(root, `docs/assets/zh-cn/settings-${tab}.png`), path.join(root, dest));
+      report.push(dest);
+    }
     await p.locator("#settings-close").click();
   }
   await p.locator("#btn-settings").click();

@@ -29,6 +29,9 @@ try {
    if(tab==='browser')assert.ok(await p.locator('.set-foot').isVisible(),'browser confirmation setting can be saved');
    const overflow=await p.locator('#dlg-settings').evaluate(e=>e.scrollWidth>e.clientWidth+1);
    assert.equal(overflow,false,theme+' '+tab+' horizontal overflow');
+   const color=await p.locator('#set-nav button:not(.on) .kubai-icon').first().evaluate(e=>getComputedStyle(e).color);
+   const expected=await p.evaluate(()=>{const e=document.createElement('span');e.style.color='var(--text)';document.body.append(e);const color=getComputedStyle(e).color;e.remove();return color;});
+   assert.equal(color,expected,'Mono navigation uses full foreground contrast');
    await capture(p,`settings-${tab}-${theme}`);
   }
   await p.locator('[data-tab="network"]').click();
