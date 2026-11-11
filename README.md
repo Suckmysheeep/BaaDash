@@ -107,7 +107,12 @@ BaaDash 是一个中文优先的桌面下载管理器，基于 Rust 与 Tauri 2�
 | macOS | `BaaDash_*_universal.dmg` | Apple 芯片与 Intel 通用 |
 | Linux | `.AppImage` · `.deb` · `.rpm` | 按发行版选择 |
 
-Windows 安装包暂未做代码签名，SmartScreen 可能提示「发布者未知」。请确认下载来源为本仓库 Releases，再走「更多信息 → 仍要运行」。
+Windows 安装包目前尚未代码签名，Windows 的两道防护表现不同，请对号入座：
+
+- **SmartScreen**（Windows 10，以及由旧版本升级而来的 Windows 11）：可能提示「发布者未知」。确认来源为本仓库 Releases 后，点「更多信息 → 仍要运行」即可继续。
+- **智能应用控制 / Smart App Control**（全新安装的 Windows 11 默认开启）：会直接拦截未签名程序，**没有单文件放行**，上面的「仍要运行」在这里无效。
+
+代码签名已在计划中，签名版本发布后上述提示都会消除。在此之前，开启了智能应用控制的用户建议等待签名版本；确需立即使用，可在「Windows 安全中心 → 应用和浏览器控制 → 智能应用控制」将其关闭，但这会降低整机防护，请自行权衡。无论如何都请只从本仓库 Releases 下载安装包。
 
 ## 浏览器扩展
 
