@@ -84,5 +84,6 @@ BaaDash 的首个正式版本，以新的项目身份发布，承接此前中文
 - 分享文本功能只提取普通链接，不增加站点专用解析，不绕过登录、会员、DRM 或网站访问限制。
 - 多连接不能突破实际带宽，速度取决于服务器、网络与磁盘；续传取决于服务器是否支持及文件是否变更。
 
-[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.1.0
