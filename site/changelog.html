@@ -33,41 +33,27 @@
     </header>
     <main class="document">
       <div class="eyebrow">CHANGELOG</div>
-      <h1>这次，少一些打扰。</h1>
-      <p class="lede">v0.1.0 · 2026-11-10</p>
+      <h1>每一次更新，都有记录。</h1>
+      <p class="lede">v0.2.0 · 2026-11-11</p>
       <section class="section">
-        <h2>浏览器扩展</h2>
+        <h2>修复</h2>
         <ul>
-          <li>新增资源嗅探、视频浮层、图片浮层及单站点图片按钮开关。</li>
-          <li>图片浮层默认关闭；视频按钮短暂显示并自动隐藏。</li>
-          <li>排除播放器封面，避免图片和视频按钮叠加。</li>
+        <li>GIF 转换结果单独列入已完成记录，可直接打开 GIF 或定位文件，保留原视频或 ZIP。</li>
+        <li>扩展安装指南展示和复制普通 Windows 路径，正确处理 \\?\ 和 UNC 路径。</li>
+        <li>吸收上游 Google Drive 分享链接转换、网页误下载识别、扩展接管前探测与浏览器回退。</li>
+        <li>视频流优先选择最近播放的资源；改进 yt-dlp 原始字节读取及 Windows 管道，明确提示过期链接。</li>
+        <li>保留已有分段响应、续传验证、中文文件名、图片和 GIF 功能。</li>
         </ul>
-        <h2>桌面端</h2>
+        <h2>新增</h2>
         <ul>
-          <li>设置页固定关闭按钮。</li>
-          <li>显式多选、全选与批量操作。</li>
-          <li>当前视图历史清理，默认保留文件。</li>
-          <li>关于页手动检查更新。</li>
+        <li>跟随系统代理，支持手动 HTTP / SOCKS5 代理及本地网络 IP 绑定；网络设置重启生效。</li>
+        <li>可选 SHA-256 整文件校验、替换普通文件失效链接后安全续传。</li>
+        <li>队列位置、下一个下载、失败后使用浏览器下载、托盘限速切换。</li>
+        <li>批量链接范围展开，如 file[01-50].zip，最多 500 个。</li>
+        <li>界面缩放 90–150%、可选剪贴板监视、队列定时开始和全部成功完成后的一次性退出／休眠／关机。</li>
         </ul>
-        <h2>下载保护与品牌</h2>
-        <ul>
-          <li>增加分段响应及续传记录校验。</li>
-          <li>保存失败时反馈，避免静默失败。</li>
-          <li>统一 MONO 羊头图标与细体 C 字标。</li>
-          <li>全部界面展示图重新拍摄，README 完整重写。</li>
-        </ul>
-        <p>
-          <a
-            class="button"
-            href="https://github.com/Suckmysheeep/BaaDash/releases"
-            >已发布版本 ↗</a
-          >
-          <a
-            class="button"
-            href="https://github.com/Suckmysheeep/BaaDash/blob/main/CHANGELOG.md"
-            >完整历史记录 ↗</a
-          >
-        </p>
+        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.2.0">查看此版本 ↗</a>
+        <a class="button" href="https://github.com/Suckmysheeep/BaaDash/blob/main/CHANGELOG.md">完整历史记录 ↗</a></p>
       </section>
     </main>
     <footer>

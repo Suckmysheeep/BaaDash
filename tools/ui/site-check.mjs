@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { root, start } from "./runtime.mjs";
 const { browser, server, origin } = await start();
 const failures = [];
+const releaseVersion = /^## \[(\d+\.\d+\.\d+)\] - /m.exec(fs.readFileSync(path.join(root, "CHANGELOG.md"), "utf8"))?.[1];
+assert.ok(releaseVersion, "CHANGELOG release version is required");
 try {
   for (const width of [390, 1440])
     for (const name of ["index", "download", "changelog"]) {
@@ -15,6 +17,9 @@ try {
       });
       await p.route("https://api.github.com/**", (r) => r.abort());
       await p.goto(origin + "/site/" + name + ".html");
+      if (name === "index" || name === "changelog") {
+        assert.ok((await p.locator("main").innerText()).includes(`v${releaseVersion}`), `${name} must show the current CHANGELOG version`);
+      }
       await p.evaluate(() => document.fonts.ready);
       await p.waitForTimeout(200);
       assert.equal(
