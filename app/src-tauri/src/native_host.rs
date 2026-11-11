@@ -311,7 +311,8 @@ fn refused(v: &Value) -> Option<String> {
     }
     let headers = crate::manager::to_header_map(&inc.headers());
     let probe = async {
-        let client = swiftdl_engine::build_client().ok()?;
+        let settings = crate::settings::native_settings()?;
+        let client = swiftdl_engine::build_client_opts(&settings.proxy, &settings.bind_address).ok()?;
         tokio::time::timeout(std::time::Duration::from_secs(8), swiftdl_engine::probe(&client, &inc.url, &headers)).await.ok()
     };
     let result = tauri::async_runtime::block_on(probe)?;
@@ -355,4 +356,3 @@ mod refusal_tests {
         assert_eq!(ask("https://www.youtube.com/watch?v=abc"), None, "video pages go through yt-dlp");
     }
 }
-

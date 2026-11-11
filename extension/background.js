@@ -129,10 +129,17 @@ async function siteDisabled(url) {
   return !!host && disabledSites.includes(host);
 }
 
+// "Download in browser" in the app opens the link with #swiftdl-browser on the
+// end. The browser then keeps that one download, with its own session.
+const browserOnce = new Map();
+const markBrowser = (u) => { if (typeof u === "string" && u.includes("#swiftdl-browser")) browserOnce.set(u.split("#")[0], Date.now() + 60000); };
+chrome.tabs.onCreated.addListener((t) => markBrowser(t.pendingUrl || t.url));
+chrome.tabs.onUpdated.addListener((_id, info) => markBrowser(info.url));
+
 chrome.downloads.onCreated.addListener(async (item) => {
   const settings = await getSettings();
   const url = item.finalUrl || item.url;
-  if (url.includes("#swiftdl-browser") || url.includes("&swiftdl-browser")) return;
+  if (url.includes("#swiftdl-browser") || [item.url, item.finalUrl].some(u => u && (browserOnce.get(u.split("#")[0]) || 0) > Date.now())) return;
   await log(`created #${item.id} state=${item.state} ${url}`);
   if (!settings.enabled || item.state !== "in_progress") return;
   // blob:, data: and file: URLs only exist inside the browser.

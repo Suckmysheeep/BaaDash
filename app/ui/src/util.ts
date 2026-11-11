@@ -148,6 +148,7 @@ export function displayText(value: unknown): string {
   const text = String(value ?? "");
   const exact: Record<string, string> = {
     "This link opens a web page, not a file. The site may need you to sign in or confirm first.": "链接返回的是网页，可能需要先登录或确认下载。",
+    "Checking the file": "正在校验文件",
     "Audio only": "仅音频", "Best quality": "最佳画质", "Original": "原始画质",
     "Getting yt-dlp": "正在获取 yt-dlp", "Getting ffmpeg": "正在获取 ffmpeg",
     "Unpacking ffmpeg": "正在解压 ffmpeg", "Getting video details": "正在获取视频信息",

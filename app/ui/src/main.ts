@@ -172,7 +172,7 @@ const GROUPS: [Status, string][] = [
 function grouped(list: Item[]) {
   return GROUPS.map(([s, title]) => {
     const items = list.filter((i) => i.status === s);
-    items.sort(
+    if (s !== "queued") items.sort(
       s === "completed"
         ? (a, b) => (b.completedAt || 0) - (a.completedAt || 0)
         : (a, b) => b.addedAt - a.addedAt,
@@ -520,7 +520,7 @@ function renderInspector() {
     it.status === "completed"
       ? `<button class="btn primary" data-ins="open">打开</button>`
       : it.status === "error"
-        ? `<button class="btn primary" data-ins="resume">重试</button>`
+        ? `<button class="btn" data-ins="browser">用浏览器下载</button><button class="btn primary" data-ins="resume">重试</button>`
         : isActive(it)
           ? `<button class="btn" data-ins="pause">暂停</button>`
           : `<button class="btn primary" data-ins="resume">继续</button>`;
@@ -799,6 +799,8 @@ function act(name: string, it: Item | null | undefined, anchor?: HTMLElement) {
       return pause([it.id]);
     case "resume":
       return resume([it.id]);
+    case "browser":
+      return void invoke("open_url", {url: it.url.split("#")[0] + "#swiftdl-browser"});
     case "copy":
       return void copy(it.url, "链接已复制");
     case "copy-path":
@@ -879,7 +881,7 @@ function itemMenu(it: Item, x: number, y: number, above = false) {
     [
       { icon: "play", label: "下一个下载", enabled: it.status === "queued", run: () => void call("download_next", {id: it.id}) },
       { icon: "link", label: "从剪贴板替换失效链接", enabled: ["paused", "error"].includes(it.status) && !it.format && !it.torrentFiles, run: () => void replaceLink(it) },
-      { icon: "link", label: "用浏览器下载", enabled: it.status === "error", run: () => void invoke("open_url", {url: it.url + (it.url.includes("#") ? "&" : "#") + "swiftdl-browser"}) },
+      { icon: "link", label: "用浏览器下载", enabled: it.status === "error", run: () => void invoke("open_url", {url: it.url.split("#")[0] + "#swiftdl-browser"}) },
       {
         icon: "open",
         label: "打开",

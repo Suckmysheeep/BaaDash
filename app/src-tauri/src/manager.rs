@@ -773,30 +773,8 @@ impl DownloadManager {
         let mut g = self.inner.lock().unwrap();
         let Some(source) = g.items.iter().find(|i| i.id == source_id).cloned() else { return };
         if g.items.iter().any(|i| i.path == path) { return; }
-        let mut output = source;
-        output.checksum = None;
-        output.verified = false;
-        output.id = g.next_id;
+        let output = completed_gif(&source, g.next_id, path);
         g.next_id += 1;
-        output.filename = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
-        output.size = std::fs::metadata(&path).ok().map(|m| m.len());
-        output.downloaded = output.size.unwrap_or(0);
-        output.path = path;
-        output.category = "Images".into();
-        output.status = Status::Completed;
-        output.completed_at = Some(now_ms());
-        output.error = None;
-        output.note = None;
-        output.headers.clear();
-        output.remaining.clear();
-        output.segments.clear();
-        output.connections = 0;
-        output.speed = 0.0;
-        output.resumable = false;
-        output.format = None;
-        output.torrent_files = None;
-        output.convert_gif = false;
-        output.gif_options = None;
         g.items.push(output);
         g.dirty = true;
     }
@@ -1030,3 +1008,68 @@ fn sha256_file(path: &Path) -> std::io::Result<String> {
     Ok(hash.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
 
+
+fn completed_gif(source: &Item, id: u64, path: PathBuf) -> Item {
+        let mut output = source.clone();
+        output.checksum = None;
+        output.verified = false;
+        output.id = id;
+        output.filename = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+        output.size = std::fs::metadata(&path).ok().map(|m| m.len());
+        output.downloaded = output.size.unwrap_or(0);
+        output.path = path;
+        output.category = "Images".into();
+        output.status = Status::Completed;
+        output.completed_at = Some(now_ms());
+        output.error = None;
+        output.note = None;
+        output.headers.clear();
+        output.remaining.clear();
+        output.segments.clear();
+        output.connections = 0;
+        output.speed = 0.0;
+        output.resumable = false;
+        output.format = None;
+        output.torrent_files = None;
+        output.convert_gif = false;
+        output.gif_options = None;
+    output
+}
+
+#[cfg(test)]
+mod output_tests {
+    use super::*;
+    #[test]
+    fn gif_history_has_its_own_persistent_path_and_size() {
+        let dir = std::env::temp_dir().join(format!("baadash-gif-history-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("动画（1）.gif");
+        std::fs::write(&path, b"GIF89a").unwrap();
+        let source: Item = serde_json::from_value(serde_json::json!({
+            "id":1,"url":"https://example.test/video.mp4","filename":"动画.mp4","path":dir.join("动画.mp4"),
+            "size":1000,"downloaded":1000,"status":"downloading","error":null,"category":"Video",
+            "addedAt":1,"completedAt":null,"resumable":true,"convertGif":true,"headers":[["Cookie","secret"]]
+        })).unwrap();
+        let output = completed_gif(&source, 2, path.clone());
+        assert_eq!(output.status, Status::Completed);
+        assert_eq!(output.filename, "动画（1）.gif");
+        assert_eq!(output.size, Some(6));
+        assert_eq!(output.downloaded, 6);
+        assert_eq!(output.category, "Images");
+        assert!(output.headers.is_empty());
+        assert!(!output.convert_gif);
+        assert!(source.convert_gif);
+        assert_ne!(source.path, output.path);
+        let restored: Item = serde_json::from_slice(&serde_json::to_vec(&output).unwrap()).unwrap();
+        assert_eq!(restored.path, path);
+        assert_eq!(restored.id, 2);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn sha256_reads_the_actual_file() {
+        let path = std::env::temp_dir().join(format!("baadash-sha-{}",std::process::id()));
+        std::fs::write(&path,b"abc").unwrap();
+        assert_eq!(sha256_file(&path).unwrap(),"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        std::fs::remove_file(path).unwrap();
+    }
+}

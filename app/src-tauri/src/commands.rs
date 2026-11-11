@@ -144,8 +144,12 @@ pub fn open_folder(m: Mgr, id: u64) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn set_settings(m: Mgr, settings: Settings) {
+pub fn set_settings(m: Mgr, mut settings: Settings) -> Result<(), String> {
+    swiftdl_engine::build_client_opts(&settings.proxy, &settings.bind_address).map_err(|e| format!("{e:#}"))?;
+    settings.interface_scale = settings.interface_scale.clamp(90, 150);
+    if !["", "close", "sleep", "shutdown"].contains(&settings.when_finished.as_str()) { return Err("完成后动作无效".into()); }
     m.set_settings(settings);
+    Ok(())
 }
 
 #[tauri::command]

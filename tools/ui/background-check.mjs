@@ -26,6 +26,7 @@ const chrome = {
   },
   tabs: {
     get: async () => ({ url: "https://example.com" }),
+    onCreated: event("tabCreated"),
     onUpdated: event("tabUpdated"),
     onRemoved: event("tabRemoved"),
   },

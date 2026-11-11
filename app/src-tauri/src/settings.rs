@@ -63,3 +63,18 @@ impl Default for Settings {
         }
     }
 }
+
+pub fn native_settings() -> Option<Settings> {
+    #[cfg(windows)]
+    let root = PathBuf::from(std::env::var_os("APPDATA")?);
+    #[cfg(target_os = "macos")]
+    let root = PathBuf::from(std::env::var_os("HOME")?).join("Library/Application Support");
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let root = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))?;
+    let path = root.join("com.swiftdl.app/settings.json");
+    match std::fs::read(path) {
+        Ok(raw) => serde_json::from_slice(&raw).ok(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Some(Settings::default()),
+        Err(_) => None,
+    }
+}
