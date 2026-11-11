@@ -7,7 +7,7 @@ const iconSource=fs.readFileSync(path.join(root,'app/ui/src/icons.ts'),'utf8');
 const iconJS=ts.transpileModule(iconSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
 const {icon}=await import('data:text/javascript;base64,'+Buffer.from(iconJS).toString('base64'));
 const componentPath=path.join(root,'tools/ui/components.html');
-fs.writeFileSync(componentPath,fs.readFileSync(componentPath,'utf8').replace(/<div class="icon-samples">[\s\S]*?<\/div>/,()=>'<div class="icon-samples">'+['download','appearance','network','clock'].map(icon).join('')+'</div>'));
+fs.writeFileSync(componentPath,fs.readFileSync(componentPath,'utf8').replace(/<div class="icon-samples">[\s\S]*?<\/div>/,()=>'<div class="icon-samples">'+['download','appearance','network','clock'].map(icon).join('')+'</div>').trimEnd()+'\n');
 const {browser,server,origin}=await start();
 const shots=process.env.BAADASH_UI_SHOTS;
 if(shots)fs.mkdirSync(shots,{recursive:true});
