@@ -58,6 +58,17 @@ try {
  assert.equal(await fresh.evaluate(()=>document.documentElement.dataset.theme),'dark');
  assert.equal(await fresh.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--accent')),accentTokens('#db2777',true).color);
  await fresh.close();await q.close();
+ await open();await p.evaluate(()=>window.setTheme('dark',false));await p.locator('#set-accent-hex').fill('#ffffff');
+ await p.locator('[data-tab="general"]').click();
+ const knob=await p.locator('#set-notify + i').evaluate(e=>getComputedStyle(e,'::after').backgroundColor);
+ assert.equal(knob,'rgb(0, 0, 0)','light accent keeps a visible switch thumb');
+ await p.keyboard.press('Escape');
+ await p.locator('#btn-add').click();await p.locator('#add-url').fill('https://example.test/file.zip');
+ await p.waitForFunction(()=>!document.querySelector('#add-start').disabled);
+ await p.locator('#add-advanced summary').click();await p.locator('#add-verify').check();
+ await p.evaluate(()=>{window.setTheme('dark',false);window.setAccent('#ffffff');});
+ assert.equal(await p.locator('#add-verify').evaluate(e=>getComputedStyle(e,'::after').borderTopColor),'rgb(0, 0, 0)','checkmark contrasts against a light custom accent');
+ await p.locator('#add-x').click();
  await p.locator('#btn-settings').hover();
  assert.ok(await p.locator('#btn-settings .lucide-icon').evaluate(e=>e.getAnimations().length)>0,'primary entry animates');
  await p.emulateMedia({reducedMotion:'reduce'});await p.mouse.move(0,0);await p.locator('#btn-settings').hover();

@@ -1815,6 +1815,7 @@ code {
 }
 .switch input:checked + i::after {
   transform: translateX(14px);
+  background: var(--on-accent);
 }
 .switch input:focus-visible + i {
   outline: 2px solid var(--accent);
@@ -2495,7 +2496,7 @@ code {
 .form-range::-moz-range-thumb { width:12px; height:12px; border:2px solid var(--panel); border-radius:50%; background:var(--accent); box-shadow:0 0 0 1px var(--accent); }
 .advanced-toggle input { appearance:none; border:1px solid var(--border-2); border-radius:4px; background:var(--panel); }
 .advanced-toggle input:checked { background:var(--accent); border-color:var(--accent); }
-.advanced-toggle input:checked::after { content:""; display:block; width:4px; height:8px; border:solid white; border-width:0 1.6px 1.6px 0; transform:rotate(45deg); margin:1px 0 0 5px; }
+.advanced-toggle input:checked::after { content:""; display:block; width:4px; height:8px; border:solid var(--on-accent); border-width:0 1.6px 1.6px 0; transform:rotate(45deg); margin:1px 0 0 5px; }
 /* Appearance controls share semantic tokens with real tasks. */
 .accent-section { padding:18px 16px; border-top:1px solid var(--border); }
 .accent-heading { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
