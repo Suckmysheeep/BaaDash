@@ -5,6 +5,7 @@ import { taskAdvanced, bindTaskAdvanced, readTaskChecksum } from "./advanced";
 //   download.html?id=<id>          live progress, then "Download complete"
 
 import "./styles.css";
+import "./workspace.css";
 import "./download.css";
 import { invoke, listen, currentWindow, LogicalSize, $ } from "./api";
 import type { Item, Incoming, Header, MediaInfo, TorrentInfo, AddRequest, ProbeInfo, Settings, Quality } from "./api";
@@ -24,8 +25,8 @@ const view = $("view");
 // The window grows and shrinks to fit what it shows.
 const fit = () => {
   if (!win || !LogicalSize) return;
-  // The card plus the 16px transparent margin on each side (for its shadow).
-  const h = Math.ceil($("root").getBoundingClientRect().height) + 32;
+  // Content height includes overflow, while native geometry owns the frame.
+  const h = Math.ceil(view.scrollHeight + $("w-title").parentElement!.getBoundingClientRect().height);
   win.setSize(new LogicalSize(552, Math.min(780, h)));
 };
 new ResizeObserver(fit).observe($("root"));
@@ -386,8 +387,8 @@ view.addEventListener("click", async (e) => {
 });
 
 // Theme: the saved choice, and any change made in Settings while open.
-invoke("get_state").then((s) => { window.setTheme(s.settings.theme); window.setAccent(s.settings.accentColor || "#007aff", true); }).catch(() => {});
-listen("settings", (e) => { window.setTheme(e.payload.theme); window.setAccent(e.payload.accentColor || "#007aff", true); });
+invoke("get_state").then((s) => { window.setTheme(s.settings.theme); window.setAccent(s.settings.accentColor || "#e3fa61", true); }).catch(() => {});
+listen("settings", (e) => { window.setTheme(e.payload.theme); window.setAccent(e.payload.accentColor || "#e3fa61", true); });
 
 if (params.has("confirm")) confirmView(Number(params.get("confirm")));
 else if (params.has("id")) progressView(Number(params.get("id")));

@@ -11,7 +11,7 @@ const media = matchMedia("(prefers-color-scheme: dark)");
 const valid = (v: string | null): v is ThemePref => v === "system" || v === "light" || v === "dark";
 
 let pref: ThemePref = "system";
-let accent = "#007aff";
+let accent = "#e3fa61";
 try {
   const saved = localStorage.getItem("theme");
   if (valid(saved)) pref = saved;
@@ -25,12 +25,13 @@ const apply = () => {
   const dark = pref === "dark" || (pref === "system" && media.matches);
   document.documentElement.dataset.theme = dark ? "dark" : "light";
   const tokens = accentTokens(accent, dark);
-  for (const [key, value] of Object.entries({accent: tokens.color, "accent-2": tokens.color, "accent-soft": tokens.soft, "on-accent": tokens.on})) document.documentElement.style.setProperty("--" + key, value);
+  for (const [key, value] of Object.entries({accent: tokens.color, "accent-2": tokens.color, "accent-soft": tokens.soft, "on-accent": tokens.on, brand: tokens.brand, "on-brand": tokens.onBrand})) document.documentElement.style.setProperty("--" + key, value);
+  window.dispatchEvent(new Event("appearance-change"));
 };
 media.addEventListener("change", apply);
 
 window.setAccent = (next: string, persist = false) => {
-  accent = validAccent(next) ? next.toLowerCase() : "#007aff";
+  accent = validAccent(next) ? next.toLowerCase() : "#e3fa61";
   if (persist) { try { localStorage.setItem("accentColor", accent); } catch { /* optional cache */ } }
   apply();
 };

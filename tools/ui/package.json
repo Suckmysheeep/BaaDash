@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node checks.mjs && node background-check.mjs && node site-check.mjs && node v020-check.mjs && node v030-check.mjs && node v031-check.mjs",
+    "test": "node checks.mjs && node background-check.mjs && node site-check.mjs && node v020-check.mjs && node v030-check.mjs && node v031-check.mjs && node v040-check.mjs",
     "screenshots": "node screenshots.mjs"
   },
   "dependencies": {

@@ -33,7 +33,7 @@ declare global {
     showProgressWindow: true,
     closeToTray: true,
     theme: "system",
-    accentColor: "#007aff",
+    accentColor: "#e3fa61",
     seedUntil: "stop",
   };
   if (VIDEO)
@@ -264,7 +264,7 @@ declare global {
       items: clone(),
       settings: { ...settings },
       pending: [],
-      version: "0.3.1",
+      version: "0.4.0",
     }),
     probe_url: async ({ url }) => {
       if (!VIDEO) await new Promise((r) => setTimeout(r, 700));
@@ -451,7 +451,7 @@ declare global {
     probe_note: () => null,
     show_main: () => {},
     check_update: () => ({
-      version: "0.3.1",
+      version: "0.4.0",
       page: "https://github.com/Suckmysheeep/BaaDash/releases/latest",
       asset: null,
     }),

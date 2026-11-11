@@ -39,7 +39,7 @@ try {
   await page.locator('[data-tab="appearance"]').click();
   await page.locator("#set-scale").fill("120");
   assert.equal(await page.evaluate(()=>document.documentElement.style.zoom),"1.2");
-  await page.locator("#settings-close").click();
+  await page.locator("#set-cancel").click();
   await page.waitForFunction(()=>document.documentElement.style.zoom === "1");
   assert.equal(await page.evaluate(()=>document.documentElement.style.zoom),"1");
   await page.locator("#btn-settings").click();
@@ -49,7 +49,7 @@ try {
     await page.setViewportSize({width,height:760});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`settings overflow at ${width}`);
   }
-  await page.locator("#settings-close").click();
+  await page.locator("#set-cancel").click();
   assert.equal(await page.locator("#add-checksum").getAttribute("maxlength"),"64");
   assert.deepEqual(errors,[]);
   console.log("PASS: v0.2.0 range expansion, newest streams, proxy controls, scale preview/cancel and settings layout.");

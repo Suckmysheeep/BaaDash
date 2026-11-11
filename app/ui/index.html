@@ -6,85 +6,9 @@
     <title>BaaDash</title>
   </head>
   <body>
-    <div class="app">
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="side-top" data-tauri-drag-region>
-          <div class="brand" data-tauri-drag-region>
-            <img src="logo.svg" alt="" width="24" height="24" /><img
-              class="brand-type wordmark-light"
-              src="logo-type.svg"
-              alt="BaaDash"
-              width="94"
-              height="18"
-            /><img
-              class="brand-type wordmark-dark"
-              src="logo-type-dark.svg"
-              alt="BaaDash"
-              width="94"
-              height="18"
-            />
-          </div>
-          <button class="sq-btn" id="btn-palette" title="搜索与命令（Ctrl K）">
-            <i data-icon="search"></i>
-          </button>
-          <button
-            class="sq-btn bordered"
-            id="btn-add"
-            title="新建下载（Ctrl N）"
-          >
-            <i data-icon="compose"></i>
-          </button>
-        </div>
-        <nav class="nav" id="nav"></nav>
-        <div class="side-bottom">
-          <div class="net" id="net">
-            <div class="net-head">
-              <span>网络</span
-              ><button class="limit" id="limit-btn" title="下载限速"></button>
-            </div>
-            <div class="net-speed">
-              <b id="net-speed">0</b><span id="net-unit">B/s</span>
-            </div>
-            <canvas id="net-graph"></canvas>
-            <div class="net-foot" id="net-foot">空闲</div>
-          </div>
-          <button class="nav-item" id="btn-settings">
-            <span class="ni-icon"><i data-icon="settings"></i></span
-            ><span class="ni-label">设置</span>
-          </button>
-        </div>
-      </aside>
-
-      <!-- Main card -->
-      <main class="main">
-        <header class="header" data-tauri-drag-region>
-          <div class="h-title" data-tauri-drag-region>
-            <span class="h-icon" id="h-icon"></span
-            ><span id="h-name">全部下载</span
-            ><span class="h-count" id="h-count"></span>
-          </div>
-          <div class="h-actions">
-            <button class="ghost-btn" id="btn-pause-all">
-              <i data-icon="pause"></i>全部暂停
-            </button>
-            <button class="ghost-btn" id="btn-resume-all">
-              <i data-icon="play"></i>全部继续
-            </button>
-            <button class="ghost-btn" id="btn-select" title="选择多个任务">
-              多选
-            </button>
-            <button
-              class="ghost-btn"
-              id="btn-history"
-              title="清理当前视图中的已完成与失败记录"
-            >
-              清理历史
-            </button>
-            <button class="search-btn" id="btn-search">
-              <i data-icon="search"></i><span>搜索</span><kbd>Ctrl K</kbd>
-            </button>
-            <span class="win-ctrls" id="win-ctrls">
+    <div class="app shell">
+      <aside class="sidebar"><div class="side-top" data-tauri-drag-region><div class="brand" data-tauri-drag-region><img src="logo.svg" alt="" width="28" height="28"><span>BaaDash</span></div></div><div class="workspace-label">任务管理</div><nav class="nav navigation" id="nav"></nav><div class="side-bottom"><button class="nav-item" id="browser-entry"><span class="connection-dot"></span><span class="ni-label">浏览器集成</span><i data-icon="chevron"></i></button><button class="nav-item" id="btn-settings"><span class="ni-icon"><i data-icon="settings"></i></span><span class="ni-label">设置</span></button><div class="side-foot"><span id="sidebar-version">BaaDash</span><button id="theme-toggle" class="sq-btn" title="切换主题" aria-label="切换主题"><i data-icon="sun"></i></button></div></div></aside>
+      <main class="main workspace"><header class="header topbar" data-tauri-drag-region><div class="h-title" data-tauri-drag-region><span id="h-icon"></span><span id="h-name">全部任务</span><span id="h-count"></span></div><div class="h-actions"><button class="ghost-btn" id="btn-palette" title="搜索与命令（Ctrl K）" hidden><i data-icon="search"></i></button><button class="search-btn" id="btn-search"><i data-icon="search"></i><span>搜索任务</span><kbd>Ctrl K</kbd></button><button class="btn primary" id="btn-add"><i data-icon="plus"></i>新建下载</button><span class="win-ctrls" id="win-ctrls">
               <button id="w-min" title="最小化">
                 <svg viewBox="0 0 10 10"><path d="M1 5h8" /></svg>
               </button>
@@ -96,43 +20,14 @@
               <button id="w-close" class="close" title="关闭">
                 <svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2 2 8" /></svg>
               </button>
-            </span>
-          </div>
-        </header>
-        <div class="bulk-bar" id="bulk-bar" hidden>
-          <label><input type="checkbox" id="bulk-all" /> 全选当前列表</label
-          ><span id="bulk-count"></span><span class="grow"></span
-          ><button class="btn sm" id="bulk-pause">暂停</button
-          ><button class="btn sm" id="bulk-resume">继续 / 重试</button
-          ><button class="btn sm" id="bulk-remove">移除…</button
-          ><button class="sq-btn" id="bulk-exit" title="退出多选">×</button>
-        </div>
-        <div class="body">
-          <div class="list" id="list">
-            <div class="onboard" id="update" hidden></div>
-            <div class="onboard" id="onboard" hidden></div>
-            <div id="rows"></div>
-            <div class="empty" id="empty" hidden>
-              <div class="empty-icon"><i data-icon="download"></i></div>
-              <h2 id="empty-title">还没有下载任务</h2>
-              <p id="empty-text">
-                粘贴链接、将链接拖到此窗口，或在浏览器中开始下载。
-              </p>
-              <div class="empty-actions" id="empty-actions">
-                <button class="btn primary" id="empty-add">
-                  <i data-icon="plus"></i>新建下载 <kbd>Ctrl N</kbd>
-                </button>
-                <button class="btn" id="empty-ext">
-                  <i data-icon="globe"></i>获取浏览器扩展
-                </button>
-              </div>
-            </div>
-          </div>
-          <aside class="inspector" id="inspector" hidden></aside>
-        </div>
-      </main>
+            </span></div></header>
+      <div id="task-workspace"><div class="telemetry"><section class="speed-monitor" id="net"><div class="monitor-title"><span><i class="signal-dot"></i>实时网速</span><button class="limit" id="limit-btn" title="下载限速">不限速</button></div><div class="speed-layout"><div class="speed-readout"><div><b id="net-speed">0</b><span id="net-unit">B/s</span></div><small>峰值 <strong id="net-peak">0 B/s</strong></small></div><div class="speed-plot"><canvas id="net-graph" aria-label="最近60秒下载速度曲线"></canvas><div class="plot-times"><span>−60 秒</span><span>−30 秒</span><span>现在</span></div></div></div></section><section class="thread-monitor"><div class="monitor-title"><span>多线程分段</span><button id="inspect-threads" class="ghost-btn">查看详情 <i data-icon="chevron"></i></button></div><div class="thread-file"><span id="thread-name">无活动任务</span><b id="thread-progress">—</b></div><div class="thread-grid" id="thread-matrix" role="img" aria-label="连接分段"></div><div class="thread-legend"><span><i class="matrix-complete"></i>已下载</span><span><i class="matrix-current"></i>传输中</span><span><i class="matrix-pending"></i>待下载</span><b id="thread-connections">0 个连接</b></div></section></div>
+      <div class="list-toolbar"><div class="filters" id="status-filters"><button data-status="all" class="on">全部</button><button data-status="downloading">下载中</button><button data-status="paused">已暂停</button><button data-status="queued">排队中</button></div><div class="list-tools"><button class="ghost-btn" id="btn-pause-all"><i data-icon="pause"></i>全部暂停</button><button class="ghost-btn" id="btn-resume-all"><i data-icon="play"></i>全部继续</button><button class="ghost-btn" id="btn-select">多选</button><button class="ghost-btn" id="btn-history">清理历史</button></div></div>
+      <div class="bulk-bar" id="bulk-bar" hidden><label><input type="checkbox" id="bulk-all">全选当前列表</label><span id="bulk-count"></span><span class="grow"></span><button class="btn sm" id="bulk-pause">暂停</button><button class="btn sm" id="bulk-resume">继续 / 重试</button><button class="btn sm" id="bulk-remove">移除…</button><button class="sq-btn" id="bulk-exit" title="退出多选">×</button></div>
+      <div class="body"><div class="list" id="list"><div class="onboard" id="update" hidden></div><div class="onboard" id="onboard" hidden></div><div class="table-viewport"><div class="table-heading"><span>文件名 / 来源</span><span>已下载 / 大小</span><span>状态 / 进度</span><span>下载速度</span><span>剩余时间</span><span>连接</span><span>操作</span></div><div id="rows"></div></div><div class="empty" id="empty" hidden><div class="empty-icon"><i data-icon="download"></i></div><h2 id="empty-title">还没有下载任务</h2><p id="empty-text">粘贴链接、拖入链接，或从浏览器开始下载。</p><div class="empty-actions" id="empty-actions"><button class="btn primary" id="empty-add"><i data-icon="plus"></i>新建下载 <kbd>Ctrl N</kbd></button><button class="btn" id="empty-ext"><i data-icon="globe"></i>获取浏览器扩展</button></div></div></div><aside class="inspector" id="inspector" hidden></aside></div></div><footer class="workspace-status"><span id="net-foot">空闲</span><span id="workspace-count"></span></footer></main>
     </div>
 
+    <dialog id="dlg-settings-leave" class="modal confirm"><div class="confirm-head"><h2>保存设置更改？</h2><p>离开设置前，可以保存更改或放弃本次修改。</p></div><div class="confirm-foot"><button class="btn" id="settings-stay">继续编辑</button><button class="btn" id="settings-discard">放弃更改</button><button class="btn primary" id="settings-save-leave">保存并离开</button></div></dialog>
     <div class="toasts" id="toasts"></div>
     <div class="drop" id="drop" hidden>
       <div class="drop-card">
@@ -252,7 +147,7 @@
     </dialog>
 
     <!-- Settings -->
-    <dialog id="dlg-settings" class="modal settings">
+    <dialog id="dlg-settings" class="modal settings settings-page" aria-label="设置">
       <form method="dialog" id="form-settings">
         <nav class="set-nav" id="set-nav"><div class="set-nav-title">设置</div><button type="button" data-tab="general" class="on"><i data-icon="sliders"></i><span>常规</span></button>
 <button type="button" data-tab="appearance"><i data-icon="appearance"></i><span>外观</span></button>
@@ -266,12 +161,10 @@
             type="button"
             class="sq-btn settings-close"
             id="settings-close"
-            aria-label="关闭设置"
-            title="关闭设置（Esc）"
-          >
-            ×
-          </button>
-          <section data-panel="general"><h2>常规</h2><p class="lead">决定 BaaDash 如何与你一起工作。</p><div class="set-group"><label class="set-row"><div class="sr-text">
+            aria-label="返回下载列表"
+            title="返回下载列表（Esc）"
+          ><i data-icon="chevron"></i><span>返回下载列表</span></button>
+          <section data-panel="general"><h2>常规</h2><p class="lead">托盘、通知与窗口行为</p><div class="set-group"><label class="set-row"><div class="sr-text">
                   <b>关闭后保留在系统托盘</b><span>关闭窗口后继续下载并保持浏览器集成运行</span>
                 </div>
                 <span class="switch"><input type="checkbox" id="set-tray"><i></i></span></label>
@@ -284,7 +177,7 @@
                 </div>
                 <span class="switch"><input type="checkbox" id="set-progress-win"><i></i></span></label>
 <label class="set-row"><div class="sr-text"><b>检测剪贴板链接</b><span>切回应用时，发现新的下载链接再询问是否导入。</span></div><span class="switch"><input type="checkbox" id="set-clipboard"><i></i></span></label></div></section>
-<section data-panel="appearance" hidden><h2>外观</h2><p class="lead">让界面适合你的屏幕和阅读习惯。</p><div class="set-group"><div class="set-row">
+<section data-panel="appearance" hidden><h2>外观</h2><p class="lead">主题、强调色与显示大小</p><div class="set-group"><div class="set-row">
                 <div class="sr-text">
                   <b>主题</b><span>跟随系统可自动匹配电脑的浅色或深色外观</span>
                 </div>
@@ -320,7 +213,7 @@
 <span>68%</span>
 </div>
 </div>
-<div class="set-row"><div class="sr-text"><b>界面大小</b><span>立即预览；取消时恢复原来的大小。</span></div><div class="scale-control"><input class="form-range" id="set-scale" type="range" min="90" max="150" step="10"><output id="scale-value">100%</output></div></div></div></section>
+<div class="set-row"><div class="sr-text"><b>界面密度</b><span>调整任务行高度，保留所有数据列。</span></div><div class="seg" id="set-density"><button type="button" data-density="compact">紧凑</button><button type="button" data-density="comfortable">标准</button></div></div><label class="set-row"><div class="sr-text"><b>减少动态效果</b><span>关闭非必要图标动效；始终遵循系统偏好。</span></div><span class="switch"><input id="set-reduce-motion" type="checkbox"><i></i></span></label><div class="set-row"><div class="sr-text"><b>界面大小</b><span>立即预览；取消时恢复原来的大小。</span></div><div class="scale-control"><input class="form-range" id="set-scale" type="range" min="90" max="150" step="10"><output id="scale-value">100%</output></div></div></div></section>
 <section data-panel="downloads" hidden><h2>下载与队列</h2><p class="lead">保存位置、任务并发和速度限制。</p><div class="set-group"><div class="set-row">
                 <div class="sr-text">
                   <b>下载目录</b><span id="set-dir"></span>

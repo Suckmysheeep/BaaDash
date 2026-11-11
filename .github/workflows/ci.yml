@@ -68,6 +68,21 @@ jobs:
       - run: cargo test --workspace
       - run: cargo check -p swiftdl-app
 
+      - name: Build native Windows review binary
+        run: cargo build -p swiftdl-app --release --features tauri/custom-protocol
+      - name: Prepare native review files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force target/native-review | Out-Null
+          Copy-Item target/release/swiftdl-app.exe target/native-review/
+          Copy-Item extension target/native-review/extension -Recurse
+          Copy-Item app/src-tauri/gen/extension-firefox target/native-review/extension-firefox -Recurse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-review
+          path: target/native-review/
+          retention-days: 3
+
   interface:
     runs-on: ubuntu-latest
     steps:

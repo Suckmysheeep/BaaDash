@@ -47,7 +47,7 @@ try {
   assert.equal(await p.locator('#set-start-at').isVisible(),false);
   await p.locator('#set-schedule-enabled').check();
   assert.ok(await p.locator('#set-start-at').isVisible());
-  await p.locator('#settings-close').click();
+  await p.locator('#set-cancel').click();
  }
  const placement=await p.evaluate(()=>Object.fromEntries(['set-proxy','set-bind','set-scale','set-start-at','set-finished','set-conns','set-clipboard','set-ask'].map(id=>[id,document.getElementById(id).closest('[data-panel]').dataset.panel])));
  assert.deepEqual(placement,{'set-proxy':'network','set-bind':'network','set-scale':'appearance','set-start-at':'automation','set-finished':'automation','set-conns':'downloads','set-clipboard':'general','set-ask':'browser'});

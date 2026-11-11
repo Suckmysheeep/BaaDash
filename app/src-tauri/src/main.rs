@@ -165,6 +165,11 @@ fn main() {
                     let _ = window.hide();
                 }
             }
+            tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. } => {
+                if let Some(webview) = window.app_handle().get_webview_window(window.label()) {
+                    windows::polish(&webview);
+                }
+            }
             _ => {}
         })
         .build(tauri::generate_context!())

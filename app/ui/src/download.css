@@ -94,3 +94,7 @@ body.dlw { overflow: hidden; --win-edge: rgba(0, 0, 0, .1); }
 #c-advanced-host { margin-top:16px; }
 #c-advanced-host .advanced-panel { margin-bottom:0; }
 #view { max-height:680px; overflow-y:auto; }
+/* Native window owns corner clipping and shadow; content fills its client area. */
+html,body.dlw{background:var(--bg)}
+#root{margin:0;border-radius:0;background:var(--panel);box-shadow:none;min-height:100vh}
+body.dlw #view{overflow:auto;max-height:calc(100vh - 36px);padding-bottom:18px}

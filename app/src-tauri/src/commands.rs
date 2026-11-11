@@ -149,6 +149,7 @@ pub fn set_settings(m: Mgr, mut settings: Settings) -> Result<(), String> {
         return Err("强调色应为 #RRGGBB 格式".into());
     }
     settings.accent_color.make_ascii_lowercase();
+    if !["compact", "comfortable"].contains(&settings.interface_density.as_str()) { return Err("界面密度无效".into()); }
     swiftdl_engine::build_client_opts(&settings.proxy, &settings.bind_address).map_err(|e| format!("{e:#}"))?;
     settings.interface_scale = settings.interface_scale.clamp(90, 150);
     if !["", "close", "sleep", "shutdown"].contains(&settings.when_finished.as_str()) { return Err("完成后动作无效".into()); }

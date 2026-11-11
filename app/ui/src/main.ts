@@ -3,6 +3,8 @@ import { taskAdvanced, bindTaskAdvanced, resetTaskAdvanced, readTaskChecksum } f
 // in a normal browser, mock.ts stands in for the backend.
 
 import "./styles.css";
+import "./workspace.css";
+import {renderMatrix, taskName} from "./telemetry";
 import "./icon-motion";
 import { ACCENTS, validAccent } from "./accent";
 import { invoke, listen, currentWindow, $ } from "./api";
@@ -90,8 +92,6 @@ const eta = (it: Item) =>
   it.speed > 0 && it.size ? (it.size - it.downloaded) / it.speed : Infinity;
 const isActive = (it: Item) =>
   it.status === "downloading" || it.status === "queued";
-const ext = (name: string) =>
-  (/\.([a-z0-9]{1,5})$/i.exec(name || "") || [])[1]?.toUpperCase() || "";
 const STATUS: Record<Status, string> = {
   downloading: "下载中",
   queued: "排队中",
@@ -136,9 +136,9 @@ interface View {
   test: (i: Item) => boolean;
 }
 const VIEWS: Record<string, View> = {
-  all: { name: "全部下载", icon: "inbox", test: () => true },
+  all: { name: "全部任务", icon: "inbox", test: () => true },
   active: {
-    name: "正在下载",
+    name: "下载队列",
     icon: "arrowDown",
     test: (i) => i.status !== "completed" && i.status !== "error",
   },
@@ -154,12 +154,14 @@ const VIEWS: Record<string, View> = {
   },
 };
 const byId = (id: number | null) => state.items.find((i) => i.id === id);
+let statusFilter = "all";
 function visible() {
   const v = VIEWS[state.view];
   const q = state.search.trim().toLowerCase();
   return state.items.filter(
     (it) =>
       (v ? v.test(it) : it.category === state.view) &&
+      (statusFilter === "all" || it.status === statusFilter) &&
       (!q ||
         it.filename.toLowerCase().includes(q) ||
         it.url.toLowerCase().includes(q)),
@@ -281,10 +283,10 @@ function renderNav() {
   ) =>
     `<button class="nav-item ${state.view === view ? "on" : ""}" data-view="${view}"><span class="ni-icon">${ic}</span><span class="ni-label">${label}</span>${extra}<span class="ni-count">${n || ""}</span></button>`;
   let html =
-    item("all", "全部下载", icon("inbox"), state.items.length) +
+    item("all", "全部任务", icon("inbox"), state.items.length) +
     item(
       "active",
-      "正在下载",
+      "下载队列",
       icon("arrowDown"),
       count(VIEWS.active.test),
       live ? '<span class="ni-live"></span>' : "",
@@ -296,8 +298,7 @@ function renderNav() {
       count(VIEWS.completed.test),
     );
   const failed = count(VIEWS.failed.test);
-  if (failed || state.view === "failed")
-    html += item("failed", "下载失败", icon("alert"), failed);
+  html += item("failed", "下载失败", icon("alert"), failed);
   html += `<button class="nav-sec ${state.typesOpen ? "" : "closed"}" data-toggle="types">文件类型 ${icon("chevDown")}</button>`;
   if (state.typesOpen)
     for (const name of Object.keys(CATS))
@@ -327,7 +328,10 @@ function renderNav() {
   const lim = state.settings?.speedLimitKib || 0;
   $("limit-btn").textContent = lim ? `≤ ${bytes(lim * 1024)}/s` : "不限速";
   $("limit-btn").classList.toggle("on", !!lim);
-  areaChart($("net-graph"), state.totalHist);
+  areaChart($("net-graph"), state.totalHist, {grid:true});
+  $("net-peak").textContent = speed(Math.max(0, ...state.totalHist));
+  $("workspace-count").textContent = `${state.items.length} 个任务`;
+  renderMatrix(state.items, state.selected);
 }
 
 // ---------- header ----------
@@ -353,7 +357,8 @@ function makeRow(id: number): RowEl {
   const el = document.createElement("div") as RowEl;
   el.className = "row";
   el.dataset.id = String(id);
-  el.innerHTML = `<span class="r-status"></span><div class="r-main"></div><div class="r-meta"></div>`;
+  el.tabIndex = 0;
+  el.innerHTML = `<span class="r-status"></span><div class="r-main"></div><div class="r-meta"></div><div class="r-actions"></div>`;
   el._c = [...el.children] as HTMLElement[];
   el._k = [];
   return el;
@@ -365,39 +370,21 @@ function set(el: RowEl, i: number, html: string) {
   }
 }
 function meta(it: Item) {
-  const p = Math.floor(pct(it));
-  const mini = (cls: string) =>
-    `<span class="mini ${cls}"><i style="width:${pct(it)}%"></i></span><span class="pct">${it.size ? p + "%" : ""}</span>`;
-  switch (it.status) {
-    case "downloading":
-      return `${mini("")}<span class="m-size">${bytes(it.downloaded)} / ${bytes(it.size)}</span><span class="m-speed">${it.speed > 0 ? speed(it.speed) : "正在连接…"}</span><span class="m-eta">${dur(eta(it))}</span>`;
-    case "queued":
-      return `${mini("queued")}<span class="m-size">${it.size ? bytes(it.size) : "—"}</span><span class="m-speed" style="color:var(--muted);font-weight:500">排队第 ${state.items.filter(i => i.status === "queued").findIndex(i => i.id === it.id) + 1} 位</span><span class="m-eta"></span>`;
-    case "paused":
-      return `${mini("paused")}<span class="m-size">${bytes(it.downloaded)} / ${bytes(it.size)}</span><span class="m-speed" style="color:var(--amber);font-weight:500">已暂停</span><span class="m-eta"></span>`;
-    case "error":
-      return `<span class="m-size">${bytes(it.size)}</span><span class="m-when">${when(it.addedAt)}</span>`;
-    default:
-      return `<span class="cat"><i style="background:${cat(it).color}"></i>${categoryLabel(it.category)}</span><span class="m-size">${bytes(it.size)}</span><span class="m-when">${when(it.completedAt)}</span>`;
-  }
+  const progress = it.size ? pct(it).toFixed(1) + '%' : '—';
+  const queue = state.items.filter(i => i.status === 'queued').findIndex(i => i.id === it.id) + 1;
+  const status = it.status === 'queued' ? '排队 #' + queue : STATUS[it.status];
+  return `<div class="m-size data-cell"><b>${bytes(it.downloaded)}</b><small>/ ${bytes(it.size)}</small></div><div class="m-progress st-${it.status}"><div><span>${status}</span><b>${progress}</b></div><span class="mini ${it.status}"><i style="width:${pct(it)}%"></i></span></div><span class="m-speed data-cell">${it.status === 'downloading' ? (it.speed > 0 ? speed(it.speed) : '连接中') : '—'}</span><span class="m-eta data-cell">${it.status === 'downloading' ? dur(eta(it)) : '—'}</span><span class="m-conns data-cell">${it.status === 'downloading' ? it.connections : 0}<small> / ${settings()?.connections || 8}</small></span>`;
 }
 function updateRow(el: RowEl, it: Item) {
-  el.classList.toggle("sel", state.selected === it.id);
-  el.classList.toggle("bulk-picked", bulkMode && bulkIds.has(it.id));
-  set(
-    el,
-    0,
-    bulkMode
-      ? `<input class="bulk-check" type="checkbox" aria-label="选择 ${esc(it.filename)}" data-bulk="${it.id}" ${bulkIds.has(it.id) ? "checked" : ""}>`
-      : statusIcon(it),
-  );
-  const e = ext(it.filename);
-  set(
-    el,
-    1,
-    `<span class="r-name" title="${esc(it.filename)}">${esc(it.filename.replace(/\.[^.]+$/, "") || it.filename)}</span>${e ? `<span class="r-ext">${e}</span>` : ""}${it.status === "error" ? `<span class="r-err">${esc(displayText(it.error) || "下载失败")}</span>` : ""}`,
-  );
+  el.classList.toggle('sel', state.selected === it.id);
+  el.classList.toggle('bulk-picked', bulkMode && bulkIds.has(it.id));
+  set(el, 0, `<input class="bulk-check" type="checkbox" aria-label="选择 ${esc(it.filename)}" data-bulk="${it.id}" ${bulkIds.has(it.id) ? 'checked' : ''}>`);
+  const source = it.status === 'error' ? displayText(it.error) || '下载失败' : it.status === 'completed' ? it.path : host(it.url);
+  set(el, 1, `<span class="r-file-icon">${icon(cat(it).icon)}</span><div class="r-identity"><div class="r-title">${taskName(it)}</div><span class="r-source ${it.status === 'error' ? 'r-err' : ''}" title="${esc(source)}">${esc(source)}</span></div>`);
   set(el, 2, meta(it));
+  const action = it.status === 'completed' ? 'open' : isActive(it) ? 'pause' : 'resume';
+  const label = it.status === 'completed' ? '打开文件' : isActive(it) ? '暂停' : it.status === 'error' ? '重试' : '继续';
+  set(el, 3, `<button class="sq-btn" data-row-action="${action}" title="${label}" aria-label="${label}">${icon(action === 'resume' ? 'play' : action)}</button><button class="sq-btn" data-row-action="more" title="更多操作" aria-label="更多操作">${icon('more')}</button>`);
 }
 function renderList() {
   const list = visible();
@@ -484,7 +471,7 @@ function renderInspector() {
   $("ins-pct").textContent = it.size ? `${Math.floor(pct(it))}%` : "";
   const bar = $("ins-bar");
   bar.className = `segbar ${it.status}`;
-  segBar(bar, null, undefined, pct(it));
+  segBar(bar, it.size, it.segments, pct(it));
   const row = (k: string, v: string) =>
     `<dt>${k}</dt><dd><span>${v}</span></dd>`;
   const stats =
@@ -950,7 +937,7 @@ document.addEventListener("contextmenu", (e) => {
 $("rows").addEventListener("mousedown", (e) => {
   const r = target(e).closest<HTMLElement>(".row"),
     it = r ? byId(Number(r.dataset.id)) : undefined;
-  if (!it || e.button !== 0) return;
+  if (!it || e.button !== 0 || target(e).closest("button,input")) return;
   if (bulkMode || e.ctrlKey || e.metaKey || e.shiftKey) {
     bulkMode = true;
     const ids = visible().map((i) => i.id);
@@ -975,6 +962,8 @@ $("rows").addEventListener("mousedown", (e) => {
   }
   select(it.id, false);
 });
+$("rows").addEventListener("click", (e) => { const b=target(e).closest<HTMLElement>("[data-row-action]"); const row=b?.closest<HTMLElement>(".row"); if(b && row) act(b.dataset.rowAction!,byId(Number(row.dataset.id)),b); });
+$("rows").addEventListener("change", (e) => { const input=target(e) as HTMLInputElement; if(!input.matches("[data-bulk]"))return;const id=Number(input.dataset.bulk);bulkMode=true;if(input.checked)bulkIds.add(id);else bulkIds.delete(id);render();rowEls.get(id)?.querySelector<HTMLInputElement>("input")?.focus(); });
 $("rows").addEventListener("contextmenu", (e) => {
   const r = target(e).closest<HTMLElement>(".row");
   const it = r ? byId(Number(r.dataset.id)) : undefined;
@@ -1004,7 +993,8 @@ $("inspector").addEventListener("click", (e) => {
   }
   act(b.dataset.ins!, byId(state.selected), b);
 });
-$("nav").addEventListener("click", (e) => {
+$("nav").addEventListener("click", async (e) => {
+  if ($("dlg-settings").open && !(await requestSettingsClose())) return;
   if (target(e).closest<HTMLElement>("[data-toggle]")) {
     state.typesOpen = !state.typesOpen;
     render();
@@ -1015,6 +1005,8 @@ $("nav").addEventListener("click", (e) => {
     bulkIds.clear();
     bulkAnchor = null;
     state.view = b.dataset.view!;
+    statusFilter = "all";
+    document.querySelectorAll<HTMLElement>("[data-status]").forEach(x => x.classList.toggle("on", x.dataset.status === "all"));
     state.search = "";
     render();
   }
@@ -1034,6 +1026,13 @@ $("btn-resume-all").onclick = () =>
 $("btn-add").onclick = $("empty-add").onclick = () => openComposer();
 $("btn-palette").onclick = $("btn-search").onclick = () => openPalette();
 $("btn-settings").onclick = () => openSettings();
+$("browser-entry").onclick = () => openSettings('browser');
+$("inspect-threads").onclick = () => { const id=renderMatrix(state.items,state.selected);if(id!==null)select(id); };
+$("status-filters").addEventListener('click',e=>{const b=target(e).closest<HTMLElement>('[data-status]');if(!b)return;statusFilter=b.dataset.status!;document.querySelectorAll<HTMLElement>('[data-status]').forEach(x=>x.classList.toggle('on',x===b));render();});
+function updateThemeToggle(){const dark=document.documentElement.dataset.theme==='dark';$("theme-toggle").innerHTML=icon(dark?'sun':'moon');$("theme-toggle").title=dark?'切换到浅色':'切换到深色';$("theme-toggle").setAttribute('aria-label',$("theme-toggle").title);}
+window.addEventListener('appearance-change',updateThemeToggle);
+$("theme-toggle").onclick=async()=>{const next=document.documentElement.dataset.theme==='dark'?'light':'dark';if($("dlg-settings").open){setThemeChoice=next;renderThemeChoice();window.setTheme(next,false);}else{try{await saveSettings({...settings(),theme:next});window.setTheme(next);}catch{/* call displays the error */}}updateThemeToggle();};
+
 $("empty-ext").onclick = () => openExtensionGuide();
 $("w-min").onclick = () => appWindow?.minimize();
 $("w-max").onclick = () => appWindow?.toggleMaximize();
@@ -1687,7 +1686,7 @@ function nextPending() {
 let setDir = "",
   setLimitKib = 0,
   setThemeChoice = "system",
-  setSeed = "stop";
+  setSeed = "stop", setDensity = "compact";
 function renderSeed() {
   $("set-seed")
     .querySelectorAll<HTMLElement>("[data-v]")
@@ -1713,8 +1712,8 @@ $("set-theme").addEventListener("click", (e) => {
   renderThemeChoice();
   window.setTheme(setThemeChoice, false);
 });
-const restoreTheme = () => { window.setTheme(settings().theme); window.setAccent(settings().accentColor || "#007aff", true); };
-let accentChoice = "#007aff";
+const restoreTheme = () => { document.documentElement.dataset.density=settings().interfaceDensity || "compact";document.documentElement.dataset.reduceMotion=String(!!settings().reduceMotion);window.setTheme(settings().theme); window.setAccent(settings().accentColor || "#e3fa61", true); };
+let accentChoice = "#e3fa61";
 $("accent-presets").innerHTML = ACCENTS.map(([color, label]) => `<button type="button" class="accent-swatch" data-color="${color}" style="--swatch:${color}" aria-label="${label}" title="${label}" aria-pressed="false"></button>`).join("");
 function previewAccent(color: string) {
   accentChoice = color.toLowerCase();
@@ -1734,13 +1733,19 @@ $("set-accent-hex").addEventListener("input", () => {
   $("set-accent-hex").setAttribute("aria-invalid", String(!valid));
   if (valid) previewAccent(value);
 });
-$("accent-reset").onclick = () => previewAccent("#007aff");
+$("accent-reset").onclick = () => previewAccent("#e3fa61");
 $("dlg-settings").addEventListener("cancel", restoreTheme); // Escape
 $("dlg-settings").addEventListener("close", restoreTheme);
+function renderDensity(){document.querySelectorAll<HTMLElement>('#set-density [data-density]').forEach(b=>b.classList.toggle('on',b.dataset.density===setDensity));document.documentElement.dataset.density=setDensity;}
+$("set-density").addEventListener('click',e=>{const b=target(e).closest<HTMLElement>('[data-density]');if(b){setDensity=b.dataset.density!;renderDensity();}});
+$("set-reduce-motion").addEventListener('change',()=>{document.documentElement.dataset.reduceMotion=String($("set-reduce-motion").checked);window.dispatchEvent(new Event('appearance-change'));});
 function openSettings(tab = "general") {
+  if ($("dlg-settings").open) { showTab(tab); return; }
   const s = settings();
   setThemeChoice = s.theme || "system";
-  previewAccent(s.accentColor || "#007aff");
+  setDensity=s.interfaceDensity || "compact";renderDensity();
+  $("set-reduce-motion").checked=!!s.reduceMotion;
+  previewAccent(s.accentColor || "#e3fa61");
   renderThemeChoice();
   setSeed = s.seedUntil || "stop";
   renderSeed();
@@ -1772,7 +1777,10 @@ function openSettings(tab = "general") {
   setLimitKib = s.speedLimitKib;
   renderLimits();
   showTab(tab);
-  $("dlg-settings").showModal();
+  $("dlg-settings").show();
+  settingsSnapshot = settingsDraftKey();
+  $("btn-settings").classList.add("on");
+  $("settings-close").focus();
 }
 function renderLimits() {
   $("set-limits").innerHTML = LIMITS.map(
@@ -1831,27 +1839,34 @@ $("set-browse").onclick = async () => {
     $("set-dir").textContent = d;
   }
 };
-$("settings-close").onclick = () => {
-  restoreTheme();
-  $("dlg-settings").close();
-};
-$("set-cancel").onclick = () => {
-  restoreTheme();
-  $("dlg-settings").close();
-};
+let settingsSnapshot = '';
+function settingsDraftKey(){return JSON.stringify([setDir,setLimitKib,setThemeChoice,setSeed,setDensity,accentChoice,...Array.from($("form-settings").querySelectorAll<HTMLInputElement>('input,select')).map(e=>[e.id,e.value,e.checked])]);}
+async function requestSettingsClose():Promise<boolean>{
+ if(!$("dlg-settings").open)return true;
+ if(settingsDraftKey()===settingsSnapshot){restoreTheme();$("dlg-settings").close();return true;}
+ const dialog=$("dlg-settings-leave");
+ return new Promise(resolve=>{let settled=false;const done=(value:boolean)=>{if(settled)return;settled=true;dialog.close();resolve(value);};
+ $("settings-stay").onclick=()=>done(false);
+ $("settings-discard").onclick=()=>{restoreTheme();$("dlg-settings").close();done(true);};
+ $("settings-save-leave").onclick=async()=>{dialog.close();done(await submitSettingsDraft());};
+ dialog.oncancel=e=>{e.preventDefault();done(false);};dialog.showModal();$("settings-stay").focus();});
+}
+$("settings-close").onclick=()=>{void requestSettingsClose();};
+$("set-cancel").onclick=()=>{restoreTheme();$("dlg-settings").close();};
+$("dlg-settings").addEventListener('close',()=>{$("btn-settings").classList.remove('on');updateThemeToggle();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape' && $("dlg-settings").open && !document.querySelector('dialog[open]:not(#dlg-settings)')){e.preventDefault();void requestSettingsClose();}});
 async function saveSettings(s: Settings) {
   await call("set_settings", { settings: s });
   state.settings = s;
   document.documentElement.style.zoom = String((s.interfaceScale || 100) / 100);
   render();
 }
-$("form-settings").addEventListener("submit", async (e) => {
-  e.preventDefault();
+async function submitSettingsDraft():Promise<boolean> {
   const clamp = (v: string, lo: number, hi: number, d: number) =>
     Math.min(hi, Math.max(lo, Number.parseInt(v, 10) || d));
-  if (!validAccent($("set-accent-hex").value.trim())) { showTab("appearance"); $("set-accent-hex").focus(); return; }
-  if ($("set-proxy-mode").value === "manual" && !$("set-proxy").value.trim()) { showTab("network"); $("set-proxy").focus(); toast("请输入代理地址，或选择跟随系统。", "err"); return; }
-  if ($("set-schedule-enabled").checked && !$("set-start-at").value) { showTab("automation"); $("set-start-at").focus(); toast("请选择队列开始时间。", "err"); return; }
+  if (!validAccent($("set-accent-hex").value.trim())) { showTab("appearance"); $("set-accent-hex").focus(); return false; }
+  if ($("set-proxy-mode").value === "manual" && !$("set-proxy").value.trim()) { showTab("network"); $("set-proxy").focus(); toast("请输入代理地址，或选择跟随系统。", "err"); return false; }
+  if ($("set-schedule-enabled").checked && !$("set-start-at").value) { showTab("automation"); $("set-start-at").focus(); toast("请选择队列开始时间。", "err"); return false; }
   try { await saveSettings({
     downloadDir: setDir || settings().downloadDir,
     sortIntoCategories: $("set-sort").checked,
@@ -1872,28 +1887,20 @@ $("form-settings").addEventListener("submit", async (e) => {
     onboardingDismissed: settings().onboardingDismissed,
     theme: setThemeChoice,
     accentColor: accentChoice,
+    interfaceDensity: setDensity,
+    reduceMotion: $("set-reduce-motion").checked,
     seedUntil: setSeed,
-  }); } catch { return; } // The toast explains the failure; keep the draft open.
+  }); } catch { return false; } // The toast explains the failure; keep the draft open.
   $("dlg-settings").close();
   toast("设置已保存", "ok");
-});
+  return true;
+}
+$("form-settings").addEventListener("submit",e=>{e.preventDefault();void submitSettingsDraft();});
 
 // ---------- data ----------
-function ingest(items: Item[]) {
-  state.items = items;
-  let total = 0;
-  for (const it of items) {
-    if (it.status !== "downloading") continue;
-    const h = state.speedHist.get(it.id) || [];
-    h.push(it.speed || 0);
-    if (h.length > HISTORY) h.shift();
-    state.speedHist.set(it.id, h);
-    total += it.speed || 0;
-  }
-  state.totalHist.push(total);
-  if (state.totalHist.length > HISTORY) state.totalHist.shift();
-  render();
-}
+function ingest(items: Item[]) { state.items=items; render(); }
+function sampleSpeeds(){let total=0;for(const it of state.items){const h=state.speedHist.get(it.id)||[];const value=it.status==='downloading'?(it.speed||0):0;h.push(value);if(h.length>HISTORY)h.shift();state.speedHist.set(it.id,h);total+=value;}for(const id of state.speedHist.keys())if(!byId(id))state.speedHist.delete(id);state.totalHist.push(total);if(state.totalHist.length>HISTORY)state.totalHist.shift();if(!document.hidden){renderNav();if(state.selected!==null)renderInspector();}}
+
 // Updates: check a few seconds after start, then twice a day. A dismissed
 // version stays quiet; the next one shows again.
 let update: UpdateInfo | null = null;
@@ -1959,14 +1966,18 @@ $("update").addEventListener("click", async (e) => {
 async function boot() {
   hydrate();
   const s = await invoke("get_state");
-  listen("settings", (e) => { state.settings = e.payload; window.setTheme(e.payload.theme); window.setAccent(e.payload.accentColor || "#007aff", true); render(); });
+  listen("settings", (e) => { state.settings = e.payload; document.documentElement.dataset.density=e.payload.interfaceDensity || "compact";document.documentElement.dataset.reduceMotion=String(!!e.payload.reduceMotion);window.setTheme(e.payload.theme); window.setAccent(e.payload.accentColor || "#e3fa61", true); render(); });
   state.settings = s.settings;
   document.documentElement.style.zoom = String((s.settings.interfaceScale || 100) / 100);
+  document.documentElement.dataset.density=s.settings.interfaceDensity || "compact";
+  document.documentElement.dataset.reduceMotion=String(!!s.settings.reduceMotion);
   window.setTheme(s.settings.theme);
-  window.setAccent(s.settings.accentColor || "#007aff", true);
+  window.setAccent(s.settings.accentColor || "#e3fa61", true);
   state.pending = s.pending;
   state.version = s.version;
   $("version").textContent = `版本 ${s.version}`;
+  $("sidebar-version").textContent = `v${s.version}`;
+  updateThemeToggle();
   ingest(s.items);
   nextPending();
   loadIntegration();
@@ -1987,13 +1998,7 @@ async function boot() {
       nextPending();
     }),
   );
-  setInterval(() => {
-    if (!state.items.some((i) => i.status === "downloading")) {
-      state.totalHist.push(0);
-      if (state.totalHist.length > HISTORY) state.totalHist.shift();
-      areaChart($("net-graph"), state.totalHist);
-    }
-  }, 500);
+  setInterval(sampleSpeeds, 500);
   addEventListener("resize", () => render());
 }
 boot();

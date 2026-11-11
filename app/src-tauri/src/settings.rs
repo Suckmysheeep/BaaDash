@@ -28,6 +28,8 @@ pub struct Settings {
     /// "system", "light" or "dark".
     pub theme: String,
     pub accent_color: String,
+    pub interface_density: String,
+    pub reduce_motion: bool,
     /// After a torrent finishes: "stop", a share ratio such as "1" or "2",
     /// or "forever".
     pub seed_until: String,
@@ -54,7 +56,9 @@ impl Default for Settings {
             show_progress_window: true,
             close_to_tray: true,
             theme: "system".into(),
-            accent_color: "#007aff".into(),
+            accent_color: "#e3fa61".into(),
+            interface_density: "compact".into(),
+            reduce_motion: false,
             seed_until: "stop".into(),
             proxy: String::new(),
             bind_address: String::new(),
@@ -88,7 +92,7 @@ mod tests {
     #[test]
     fn existing_settings_gain_default_accent_without_losing_preferences() {
         let settings: Settings = serde_json::from_str(r##"{"theme":"dark","connections":16,"downloadDir":"downloads"}"##).unwrap();
-        assert_eq!(settings.accent_color, "#007aff");
+        assert_eq!(settings.accent_color, "#e3fa61");
         assert_eq!(settings.theme, "dark");
         assert_eq!(settings.connections, 16);
         let mut updated = settings;

@@ -40,6 +40,8 @@ export interface Item {
 
 export interface Settings {
   accentColor?: string;
+  interfaceDensity?: string;
+  reduceMotion?: boolean;
   proxy?: string;
   bindAddress?: string;
   interfaceScale?: number;

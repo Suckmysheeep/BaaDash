@@ -3,34 +3,57 @@
 
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-/// Frameless windows on Windows 11 get a 1px light border from the system,
-/// which looks like a white frame in dark mode. Ask for no border and
-/// rounded corners; the shadow stays.
+/// Apply actual native window geometry, never a painted CSS corner.
 pub fn polish(window: &WebviewWindow) {
     #[cfg(windows)]
-    {
-        use std::ffi::c_void;
-        #[link(name = "dwmapi")]
-        unsafe extern "system" {
-            fn DwmSetWindowAttribute(hwnd: *mut c_void, attr: u32, value: *const c_void, size: u32) -> i32;
-        }
-        const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
-        const DWMWA_BORDER_COLOR: u32 = 34;
-        const DWMWCP_ROUND: u32 = 2;
-        const DWMWA_COLOR_NONE: u32 = 0xFFFF_FFFE;
-        if let Ok(hwnd) = window.hwnd() {
-            unsafe {
-                DwmSetWindowAttribute(hwnd.0, DWMWA_WINDOW_CORNER_PREFERENCE, (&DWMWCP_ROUND as *const u32).cast(), 4);
-                DwmSetWindowAttribute(hwnd.0, DWMWA_BORDER_COLOR, (&DWMWA_COLOR_NONE as *const u32).cast(), 4);
-            }
-        }
+    if let Ok(hwnd) = window.hwnd() {
+        let native_round = unsafe { native_shape(hwnd.0, window.is_maximized().unwrap_or(false)) };
+        // Windows 10 has no DWM corner API. Its real window region is clipped
+        // instead; disable its rectangular system shadow in that fallback.
+        if !native_round { let _ = window.set_shadow(false); }
     }
     #[cfg(not(windows))]
     let _ = window;
 }
 
-/// Card width plus the transparent margin the page uses for its shadow.
-const WINDOW_WIDTH: f64 = 520.0 + 2.0 * 16.0;
+#[cfg(windows)]
+unsafe fn native_shape(hwnd: *mut std::ffi::c_void, maximized: bool) -> bool {
+    use std::ffi::c_void;
+    #[repr(C)]
+    struct Rect { left: i32, top: i32, right: i32, bottom: i32 }
+    #[link(name = "dwmapi")]
+    unsafe extern "system" { fn DwmSetWindowAttribute(hwnd: *mut c_void, attr: u32, value: *const c_void, size: u32) -> i32; }
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        fn GetWindowRect(hwnd: *mut c_void, rect: *mut Rect) -> i32;
+        fn GetDpiForWindow(hwnd: *mut c_void) -> u32;
+        fn SetWindowRgn(hwnd: *mut c_void, region: *mut c_void, redraw: i32) -> i32;
+    }
+    #[link(name = "gdi32")]
+    unsafe extern "system" {
+        fn CreateRoundRectRgn(left:i32, top:i32, right:i32, bottom:i32, width:i32, height:i32) -> *mut c_void;
+        fn DeleteObject(object: *mut c_void) -> i32;
+    }
+    let preference: u32 = if maximized { 1 } else { 2 };
+    let border: u32 = 0xffff_fffe;
+    unsafe {
+        let result = DwmSetWindowAttribute(hwnd, 33, (&preference as *const u32).cast(), 4);
+        DwmSetWindowAttribute(hwnd, 34, (&border as *const u32).cast(), 4);
+        if result >= 0 { return true; }
+        if maximized { SetWindowRgn(hwnd, std::ptr::null_mut(), 1); return false; }
+        let mut rect = Rect { left:0, top:0, right:0, bottom:0 };
+        if GetWindowRect(hwnd, &mut rect) != 0 {
+            let diameter = ((24 * GetDpiForWindow(hwnd).max(96)) / 96) as i32;
+            let region = CreateRoundRectRgn(0, 0, rect.right-rect.left+1, rect.bottom-rect.top+1, diameter, diameter);
+            // Ownership transfers to the OS on success.
+            if !region.is_null() && SetWindowRgn(hwnd, region, 1) == 0 { DeleteObject(region); }
+        }
+        false
+    }
+}
+
+/// Actual content width; no transparent margins for a synthetic shadow.
+const WINDOW_WIDTH: f64 = 552.0;
 
 /// Puts a window in front of whatever the user is doing, like IDM's dialogs.
 /// Windows only lets a background app flash its taskbar button, but a
@@ -70,14 +93,14 @@ pub fn open(app: &AppHandle, label: &str, query: &str, title: &str) -> tauri::Re
             .resizable(false)
             .maximizable(false)
             .decorations(false)
-            .transparent(true)
-            .shadow(false)
+            .transparent(false)
+            .shadow(true)
             .center()
             .focused(true)
             .always_on_top(true)
             .build();
         match built {
-            Ok(w) => bring_to_front(&w),
+            Ok(w) => { polish(&w); bring_to_front(&w); },
             Err(e) => crate::log::line(&format!("could not open window {label}: {e:#}")),
         }
     });
