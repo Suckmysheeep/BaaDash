@@ -19,8 +19,6 @@ impl SpeedLimiter {
         Self { rate: AtomicU64::new(bytes_per_sec), bucket: Mutex::new((0.0, Instant::now())) }
     }
 
-    pub fn rate(&self) -> u64 { self.rate.load(Ordering::Relaxed) }
-
     pub fn set_rate(&self, bytes_per_sec: u64) {
         self.rate.store(bytes_per_sec, Ordering::Relaxed);
     }

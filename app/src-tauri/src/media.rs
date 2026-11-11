@@ -557,6 +557,13 @@ fn last_error(stderr: &str) -> Option<String> {
     if e.contains("Requested format is not available") && js_runtime().is_none() {
         return Some("This site needs a JavaScript runtime for yt-dlp. Install Node.js or Deno, then try again.".into());
     }
+    if e.contains("[generic]") && ["HTTP Error 404", "HTTP Error 403", "HTTP Error 410"].iter().any(|code| e.contains(code)) {
+        return Some("视频流链接已过期或仅能使用一次，请在浏览器中重新播放后下载。".into());
+    }
+    let lower = e.to_lowercase();
+    if ["--cookies", "logged-in", "authentication is required", "login required"].iter().any(|text| lower.contains(text)) {
+        return Some("此视频需要登录或当前账号有权访问，请先在浏览器中登录，再从网页的视频按钮重试。".into());
+    }
     Some(e)
 }
 
@@ -1050,5 +1057,14 @@ mod live {
             let r = super::run(&client, job, Default::default(), Default::default(), Default::default()).await.unwrap();
             println!("{r:?}: download + join {:.1}s, {} bytes", t.elapsed().as_secs_f64(), std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0));
         });
+    }
+}
+
+#[cfg(test)]
+mod error_message_tests {
+    #[test]
+    fn expired_and_signed_in_stream_errors_are_actionable() {
+        assert!(super::last_error("ERROR: [generic] Unable to download: HTTP Error 404").unwrap().contains("重新播放"));
+        assert!(super::last_error("ERROR: This video needs authentication is required").unwrap().contains("登录"));
     }
 }

@@ -7,7 +7,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use swiftdl_engine::header::{HeaderMap, HeaderName, HeaderValue};
@@ -213,6 +213,7 @@ pub struct DownloadManager {
     app: AppHandle,
     client: Client,
     limiter: Arc<SpeedLimiter>,
+    ignore_limit: AtomicBool,
     data_dir: PathBuf,
     inner: Mutex<Inner>,
 }
@@ -241,6 +242,7 @@ impl DownloadManager {
             app,
             client: swiftdl_engine::build_client_opts(&settings.proxy, &settings.bind_address)?,
             limiter: Arc::new(SpeedLimiter::new(settings.speed_limit_kib * 1024)),
+            ignore_limit: AtomicBool::new(false),
             data_dir,
             inner: Mutex::new(Inner {
                 items,
@@ -373,8 +375,8 @@ impl DownloadManager {
 
     pub fn toggle_limit(&self) {
         let limit = self.settings().speed_limit_kib * 1024;
-        let active = self.limiter.rate();
-        self.limiter.set_rate(if active == 0 { limit } else { 0 });
+        let ignored = !self.ignore_limit.fetch_xor(true, Ordering::Relaxed);
+        self.limiter.set_rate(if ignored { 0 } else { limit });
     }
 
     pub fn pause(self: &Arc<Self>, ids: &[u64]) {
@@ -448,7 +450,7 @@ impl DownloadManager {
     pub fn set_settings(self: &Arc<Self>, settings: Settings) {
         crate::media::set_proxy(&settings.proxy);
         crate::media::set_bind(&settings.bind_address);
-        self.limiter.set_rate(settings.speed_limit_kib * 1024);
+        self.limiter.set_rate(if self.ignore_limit.load(Ordering::Relaxed) { 0 } else { settings.speed_limit_kib * 1024 });
         if let Err(e) = crate::browser::offer_extension(settings.offer_extension) {
             crate::log::line(&format!("could not update browser extension offer: {e:#}"));
         }
@@ -782,6 +784,7 @@ impl DownloadManager {
 
     fn finish(self: &Arc<Self>, id: u64, result: Result<Outcome>, gif_path: Option<PathBuf>) {
         let mut notify = None;
+        let mut completed = false;
         {
             let mut g = self.inner.lock().unwrap();
             let running = g.running.remove(&id);
@@ -809,6 +812,7 @@ impl DownloadManager {
                     item.note = None;
                     match result {
                         Ok(Outcome::Completed) => {
+                            completed = true;
                             item.status = Status::Completed;
                             item.completed_at = Some(now_ms());
                             item.size = item.size.or(Some(item.downloaded));
@@ -835,7 +839,7 @@ impl DownloadManager {
         }
         let action = {
             let mut g = self.inner.lock().unwrap();
-            if g.running.is_empty() && !g.items.is_empty() && g.items.iter().all(|i| i.status == Status::Completed) {
+            if completed && g.running.is_empty() && !g.items.is_empty() && g.items.iter().all(|i| i.status == Status::Completed) {
                 std::mem::take(&mut g.settings.when_finished)
             } else { String::new() }
         };

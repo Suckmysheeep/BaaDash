@@ -33,7 +33,7 @@ pub fn show_main_window(app: &AppHandle) {
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "打开 BaaDash", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出 BaaDash", true, None::<&str>)?;
-    let limit = MenuItem::with_id(app, "limit", "切换忽略限速", true, None::<&str>)?;
+    let limit = tauri::menu::CheckMenuItem::with_id(app, "limit", "忽略限速", true, false, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &limit, &PredefinedMenuItem::separator(app)?, &quit])?;
     let mut tray = TrayIconBuilder::with_id("main").tooltip("BaaDash").menu(&menu).show_menu_on_left_click(false);
     if let Some(icon) = app.default_window_icon() {
