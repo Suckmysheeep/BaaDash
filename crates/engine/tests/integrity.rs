@@ -1,6 +1,6 @@
 //! Local HTTP fixtures exercise bytes on disk, not only range parser helpers.
 use std::{fs, io::{Read, Write}, net::TcpListener, path::PathBuf, sync::{Arc, atomic::{AtomicBool, Ordering}}, thread, time::{Duration, SystemTime, UNIX_EPOCH}};
-use swiftdl_engine::{build_client, run, CancellationToken, Outcome, Progress, Request, SpeedLimiter, header::HeaderMap};
+use swiftdl_engine::{Client, run, CancellationToken, Outcome, Progress, Request, SpeedLimiter, header::HeaderMap};
 
 struct Fixture { url: String, data: Arc<Vec<u8>>, stop: Arc<AtomicBool>, worker: Option<thread::JoinHandle<()>> }
 impl Fixture {
@@ -32,7 +32,12 @@ fn folder()->PathBuf {
     let p=std::env::temp_dir().join(format!("baadash-integrity-{}-{}-{}",std::process::id(),SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos(),NEXT.fetch_add(1,Ordering::Relaxed)));
     fs::create_dir(&p).unwrap();p
 }
-async fn download(f:&Fixture,dest:PathBuf)->anyhow::Result<Outcome>{run(&build_client()?,&Request{url:f.url.clone(),dest,connections:4,headers:HeaderMap::new(),restart:false},Arc::new(Progress::default()),CancellationToken::new(),Arc::new(SpeedLimiter::new(0))).await}
+async fn download(f:&Fixture,dest:PathBuf)->anyhow::Result<Outcome>{
+    // These byte-integrity fixtures only talk to loopback. Do not let the
+    // runner's proxy discovery or proxy settings affect local test traffic.
+    let client=Client::builder().no_proxy().http1_only().build()?;
+    run(&client,&Request{url:f.url.clone(),dest,connections:4,headers:HeaderMap::new(),restart:false},Arc::new(Progress::default()),CancellationToken::new(),Arc::new(SpeedLimiter::new(0))).await
+}
 #[tokio::test]
 async fn truncated_resume_file_is_restarted_and_bytes_match(){
     let f=Fixture::new();let dir=folder();let dest=dir.join("file.bin");
