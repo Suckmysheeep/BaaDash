@@ -67,6 +67,7 @@ async function confirmView(token: number) {
   view.innerHTML = `
     <div class="d-head"><span id="c-tile">${glyph("Other")}</span><div class="d-name"><input id="c-name" spellcheck="false" placeholder="正在获取文件信息…"><div class="d-sub"><span class="st">${esc(host(inc.url))}</span></div></div></div>
     <div class="kv">
+      <span class="k">SHA-256（可选）</span><span class="v"><input id="c-checksum" maxlength="64" placeholder="下载后校验文件"></span>
       <span class="k">下载地址</span><span class="v"><span title="${esc(inc.url)}">${esc(inc.url)}</span></span>
       <span class="k">文件大小</span><span class="v" id="c-size"><span class="spinner"></span><span class="muted">正在检查…</span></span>
       <span class="k">文件分类</span><span class="v"><select id="c-cat">${Object.keys(CATS).map((c) => `<option value="${c}">${categoryLabel(c)}</option>`).join("")}</select></span>
@@ -102,7 +103,7 @@ async function confirmView(token: number) {
   const add = async (start: boolean) => {
     const filename = $("c-name").value.trim();
     if (!filename) return;
-    const id = await addDownload({ url: inc.url, filename, dir, headers, start, window: win?.label });
+    const id = await addDownload({ checksum: $("c-checksum").value.trim() || null, url: inc.url, filename, dir, headers, start, window: win?.label });
     if (id == null) return;
     invoke("forget_confirm", { token });
     if (!start) { $("w-close").click(); return; }

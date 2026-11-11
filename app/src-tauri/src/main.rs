@@ -33,13 +33,15 @@ pub fn show_main_window(app: &AppHandle) {
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "打开 BaaDash", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出 BaaDash", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &PredefinedMenuItem::separator(app)?, &quit])?;
+    let limit = MenuItem::with_id(app, "limit", "切换忽略限速", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &limit, &PredefinedMenuItem::separator(app)?, &quit])?;
     let mut tray = TrayIconBuilder::with_id("main").tooltip("BaaDash").menu(&menu).show_menu_on_left_click(false);
     if let Some(icon) = app.default_window_icon() {
         tray = tray.icon(icon.clone());
     }
     tray.on_menu_event(|app, event| match event.id().as_ref() {
         "open" => show_main_window(app),
+        "limit" => app.state::<Arc<DownloadManager>>().toggle_limit(),
         "quit" => {
             app.state::<Arc<DownloadManager>>().save();
             app.exit(0);
@@ -121,6 +123,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_state,
+            commands::download_next,
+            commands::replace_url,
             commands::probe_url,
             commands::probe_media,
             commands::probe_note,

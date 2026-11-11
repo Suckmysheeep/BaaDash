@@ -55,6 +55,7 @@ pub fn default_dir(m: Mgr, filename: String) -> PathBuf {
 #[tauri::command]
 pub fn add_download(m: Mgr, req: AddRequest) -> Result<u64, String> {
     check_add(&req)?;
+    if req.checksum.as_ref().is_some_and(|h| h.len() != 64 || !h.bytes().all(|b| b.is_ascii_hexdigit())) { return Err("SHA-256 必须是 64 位十六进制字符".into()); }
     Ok(m.add(req))
 }
 
@@ -153,8 +154,8 @@ pub fn open_url(m: Mgr, url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn extension_dir(m: Mgr) -> Option<PathBuf> {
-    crate::browser::bundled_extension_dir(m.app_handle())
+pub fn extension_dir(m: Mgr) -> Option<String> {
+    crate::browser::bundled_extension_dir(m.app_handle()).map(|p| crate::browser::display_path(&p))
 }
 
 #[tauri::command]
@@ -276,3 +277,8 @@ pub async fn install_update(m: Mgr<'_>, url: String) -> Result<(), String> {
         m.app_handle().opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
     }
 }
+
+#[tauri::command]
+pub fn download_next(m: Mgr, id: u64) -> Result<(), String> { m.download_next(id) }
+#[tauri::command]
+pub fn replace_url(m: Mgr, id: u64, url: String) -> Result<(), String> { m.replace_url(id, url) }

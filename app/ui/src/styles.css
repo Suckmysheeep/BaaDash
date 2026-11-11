@@ -2424,3 +2424,7 @@ code {
   flex: none;
   transform: none;
 }
+
+.extra-setting { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.extra-setting > label { min-width:200px; flex:1; }
+.extra-setting > input, .extra-setting > select { width:260px; max-width:100%; }

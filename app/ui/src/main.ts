@@ -369,7 +369,7 @@ function meta(it: Item) {
     case "downloading":
       return `${mini("")}<span class="m-size">${bytes(it.downloaded)} / ${bytes(it.size)}</span><span class="m-speed">${it.speed > 0 ? speed(it.speed) : "正在连接…"}</span><span class="m-eta">${dur(eta(it))}</span>`;
     case "queued":
-      return `${mini("queued")}<span class="m-size">${it.size ? bytes(it.size) : "—"}</span><span class="m-speed" style="color:var(--muted);font-weight:500">排队中</span><span class="m-eta"></span>`;
+      return `${mini("queued")}<span class="m-size">${it.size ? bytes(it.size) : "—"}</span><span class="m-speed" style="color:var(--muted);font-weight:500">排队第 ${state.items.filter(i => i.status === "queued").findIndex(i => i.id === it.id) + 1} 位</span><span class="m-eta"></span>`;
     case "paused":
       return `${mini("paused")}<span class="m-size">${bytes(it.downloaded)} / ${bytes(it.size)}</span><span class="m-speed" style="color:var(--amber);font-weight:500">已暂停</span><span class="m-eta"></span>`;
     case "error":
@@ -487,7 +487,7 @@ function renderInspector() {
   const stats =
     it.status === "completed"
       ? row("文件大小", bytes(it.size)) +
-        row("完成时间", when(it.completedAt) || "—")
+        row("完成时间", when(it.completedAt) || "—") + (it.verified ? row("文件校验", "SHA-256 一致") : "")
       : row(
           "已下载",
           it.size
@@ -868,11 +868,18 @@ function showMenu(x: number, y: number, entries: MenuLine[], above = false) {
   menu.style.left = `${Math.max(8, Math.min(x, innerWidth - r.width - 8))}px`;
   menu.style.top = `${Math.max(8, Math.min(y, innerHeight - r.height - 8))}px`;
 }
+async function replaceLink(it: Item) {
+    const url = await navigator.clipboard.readText().catch(() => "");
+    await call("replace_url", { id: it.id, url: url.trim() });
+}
 function itemMenu(it: Item, x: number, y: number, above = false) {
   showMenu(
     x,
     y,
     [
+      { icon: "play", label: "下一个下载", enabled: it.status === "queued", run: () => void call("download_next", {id: it.id}) },
+      { icon: "link", label: "从剪贴板替换失效链接", enabled: ["paused", "error"].includes(it.status) && !it.format && !it.torrentFiles, run: () => void replaceLink(it) },
+      { icon: "link", label: "用浏览器下载", enabled: it.status === "error", run: () => void invoke("open_url", {url: it.url + (it.url.includes("#") ? "&" : "#") + "swiftdl-browser"}) },
       {
         icon: "open",
         label: "打开",
@@ -1642,6 +1649,7 @@ async function submitAdd(start: boolean) {
     req: {
       url: $("add-url").value.trim(),
       filename,
+      checksum: $("add-checksum").value.trim() || null,
       dir: add.dir || settings().downloadDir,
       headers: add.headers,
       start,
@@ -1714,6 +1722,13 @@ function openSettings(tab = "general") {
   $("set-progress-win").checked = s.showProgressWindow;
   $("set-tray").checked = s.closeToTray;
   loadIntegration();
+  $("set-proxy").value = s.proxy || "";
+  $("set-bind").value = s.bindAddress || "";
+  $("set-scale").value = String(s.interfaceScale || 100);
+  $("set-clipboard").checked = !!s.clipboardWatch;
+  $("set-finished").value = s.whenFinished || "";
+  const date = s.startAt ? new Date(s.startAt) : null;
+  $("set-start-at").value = date ? new Date(date.getTime() - date.getTimezoneOffset()*60000).toISOString().slice(0,16) : "";
   $("set-conns").value = String(s.connections);
   $("set-concurrent").value = String(s.maxConcurrent);
   setLimitKib = s.speedLimitKib;
@@ -1791,6 +1806,7 @@ $("set-cancel").onclick = () => {
 async function saveSettings(s: Settings) {
   await call("set_settings", { settings: s });
   state.settings = s;
+  document.documentElement.style.zoom = String((s.interfaceScale || 100) / 100);
   render();
 }
 $("form-settings").addEventListener("submit", async (e) => {
@@ -1803,6 +1819,12 @@ $("form-settings").addEventListener("submit", async (e) => {
     connections: clamp($("set-conns").value, 1, 32, 8),
     maxConcurrent: clamp($("set-concurrent").value, 1, 10, 3),
     speedLimitKib: setLimitKib,
+    proxy: $("set-proxy").value.trim(),
+    bindAddress: $("set-bind").value.trim(),
+    interfaceScale: clamp($("set-scale").value, 90, 150, 100),
+    clipboardWatch: $("set-clipboard").checked,
+    startAt: $("set-start-at").value ? new Date($("set-start-at").value).getTime() : null,
+    whenFinished: $("set-finished").value,
     askBeforeDownload: $("set-ask").checked,
     notifyOnComplete: $("set-notify").checked,
     offerExtension: $("set-offer").checked,
@@ -1898,6 +1920,7 @@ async function boot() {
   hydrate();
   const s = await invoke("get_state");
   state.settings = s.settings;
+  document.documentElement.style.zoom = String((s.settings.interfaceScale || 100) / 100);
   window.setTheme(s.settings.theme);
   state.pending = s.pending;
   state.version = s.version;
@@ -2032,3 +2055,20 @@ function askBulk(ids: number[], historyOnly = false) {
   };
   dlg.showModal();
 }
+
+const checksumLabel = document.createElement("label");
+checksumLabel.textContent = "SHA-256（可选）";
+const checksumInput = document.createElement("input");
+checksumInput.id = "add-checksum"; checksumInput.maxLength = 64; checksumInput.placeholder = "下载后校验文件";
+checksumLabel.append(checksumInput);
+$("add-filename").parentElement!.after(checksumLabel);
+$("dlg-add").addEventListener("close", () => { checksumInput.value = ""; });
+let lastClipboard = "";
+window.addEventListener("focus", async () => {
+  if (!settings().clipboardWatch || document.querySelector("dialog[open]")) return;
+  const text = await navigator.clipboard.readText().catch(() => "");
+  if (text && text !== lastClipboard && extractLinks(text).length) { lastClipboard = text; openBatch(text); }
+});
+
+$("set-scale").addEventListener("input", () => { document.documentElement.style.zoom = String(Math.min(150, Math.max(90, Number($("set-scale").value) || 100))/100); });
+$("dlg-settings").addEventListener("close", () => { document.documentElement.style.zoom = String((settings().interfaceScale || 100)/100); });

@@ -257,11 +257,13 @@ declare global {
     ) => Commands[K][1] | Promise<Commands[K][1]>;
   };
   const commands: Impl = {
+    download_next: () => {},
+    replace_url: () => {},
     get_state: () => ({
       items: clone(),
       settings: { ...settings },
       pending: [],
-      version: "0.1.0",
+      version: "0.2.0",
     }),
     probe_url: async ({ url }) => {
       if (!VIDEO) await new Promise((r) => setTimeout(r, 700));
@@ -447,7 +449,7 @@ declare global {
     probe_note: () => null,
     show_main: () => {},
     check_update: () => ({
-      version: "0.1.0",
+      version: "0.2.0",
       page: "https://github.com/Suckmysheeep/BaaDash/releases/latest",
       asset: null,
     }),

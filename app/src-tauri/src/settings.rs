@@ -30,6 +30,12 @@ pub struct Settings {
     /// After a torrent finishes: "stop", a share ratio such as "1" or "2",
     /// or "forever".
     pub seed_until: String,
+    pub proxy: String,
+    pub bind_address: String,
+    pub interface_scale: u32,
+    pub clipboard_watch: bool,
+    pub start_at: Option<u64>,
+    pub when_finished: String,
 }
 
 impl Default for Settings {
@@ -48,6 +54,12 @@ impl Default for Settings {
             close_to_tray: true,
             theme: "system".into(),
             seed_until: "stop".into(),
+            proxy: String::new(),
+            bind_address: String::new(),
+            interface_scale: 100,
+            clipboard_watch: false,
+            start_at: None,
+            when_finished: String::new(),
         }
     }
 }

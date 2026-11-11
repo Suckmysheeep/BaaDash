@@ -132,6 +132,7 @@ async function siteDisabled(url) {
 chrome.downloads.onCreated.addListener(async (item) => {
   const settings = await getSettings();
   const url = item.finalUrl || item.url;
+  if (url.includes("#swiftdl-browser") || url.includes("&swiftdl-browser")) return;
   await log(`created #${item.id} state=${item.state} ${url}`);
   if (!settings.enabled || item.state !== "in_progress") return;
   // blob:, data: and file: URLs only exist inside the browser.

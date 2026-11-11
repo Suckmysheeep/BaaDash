@@ -121,7 +121,30 @@ impl Shared {
 }
 
 pub fn build_client() -> Result<Client> {
-    Ok(Client::builder()
+    build_client_with("")
+}
+
+/// `proxy` is an address like `http://127.0.0.1:8080`; empty follows the
+/// system's proxy settings.
+pub fn build_client_with(proxy: &str) -> Result<Client> {
+    build_client_opts(proxy, "")
+}
+
+/// As `build_client_with`, and `bind` is a local address (like a VPN adapter's)
+/// that every connection must go out from. If that address disappears, for
+/// example the VPN drops, connections fail rather than use another route.
+pub fn build_client_opts(proxy: &str, bind: &str) -> Result<Client> {
+    let mut builder = Client::builder();
+    if !bind.trim().is_empty() {
+        builder = builder.local_address(bind.trim().parse::<std::net::IpAddr>().context("本地网络 IP 地址无效")?);
+    }
+    let proxy = proxy.trim();
+    if !proxy.is_empty() {
+        // An address reqwest can't use (say, a SOCKS one) is ignored: the
+        // system's proxy settings apply instead.
+        builder = builder.proxy(reqwest::Proxy::all(proxy).context("代理地址无效")?);
+    }
+    Ok(builder
         // HTTP/2 would multiplex every range over ONE connection and share
         // one congestion window, which defeats the point. Force HTTP/1.1 so
         // each segment gets its own TCP connection.
