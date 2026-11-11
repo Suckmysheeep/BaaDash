@@ -1,5 +1,5 @@
 [package]
-name = "swiftdl-engine"
+name = "baadash-engine"
 description = "Segmented, resumable, multi-connection download engine"
 version.workspace = true
 edition.workspace = true

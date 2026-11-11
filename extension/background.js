@@ -7,7 +7,7 @@
 // 2. Watches each tab's network traffic for video and audio files so the
 //    page button and the popup can offer them for download.
 
-const HOST = "com.swiftdl.host";
+const HOST = "com.baadash.host";
 const DEFAULTS = {
   enabled: true,
   sniffing: true,
@@ -129,17 +129,17 @@ async function siteDisabled(url) {
   return !!host && disabledSites.includes(host);
 }
 
-// "Download in browser" in the app opens the link with #swiftdl-browser on the
+// "Download in browser" in the app opens the link with #baadash-browser on the
 // end. The browser then keeps that one download, with its own session.
 const browserOnce = new Map();
-const markBrowser = (u) => { if (typeof u === "string" && u.includes("#swiftdl-browser")) browserOnce.set(u.split("#")[0], Date.now() + 60000); };
+const markBrowser = (u) => { if (typeof u === "string" && u.includes("#baadash-browser")) browserOnce.set(u.split("#")[0], Date.now() + 60000); };
 chrome.tabs.onCreated.addListener((t) => markBrowser(t.pendingUrl || t.url));
 chrome.tabs.onUpdated.addListener((_id, info) => markBrowser(info.url));
 
 chrome.downloads.onCreated.addListener(async (item) => {
   const settings = await getSettings();
   const url = item.finalUrl || item.url;
-  if (url.includes("#swiftdl-browser") || [item.url, item.finalUrl].some(u => u && (browserOnce.get(u.split("#")[0]) || 0) > Date.now())) return;
+  if (url.includes("#baadash-browser") || [item.url, item.finalUrl].some(u => u && (browserOnce.get(u.split("#")[0]) || 0) > Date.now())) return;
   await log(`created #${item.id} state=${item.state} ${url}`);
   if (!settings.enabled || item.state !== "in_progress") return;
   // blob:, data: and file: URLs only exist inside the browser.
@@ -445,12 +445,12 @@ chrome.tabs.onRemoved.addListener((tabId) =>
 function createMenus() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
-      id: "swiftdl-link",
+      id: "baadash-link",
       title: "使用 BaaDash 下载链接",
       contexts: ["link"],
     });
     chrome.contextMenus.create({
-      id: "swiftdl-media",
+      id: "baadash-media",
       title: "使用 BaaDash 下载图片／媒体",
       contexts: ["video", "audio", "image"],
     });

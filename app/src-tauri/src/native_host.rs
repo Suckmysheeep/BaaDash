@@ -72,7 +72,7 @@ fn handle(msg: &[u8]) -> Value {
 /// cookies are included. Hand it over in a short-lived local JSON file.
 fn launch_quick(msg: &[u8]) -> io::Result<()> {
     let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
-    let path = std::env::temp_dir().join(format!("swiftdl-quick-{}-{nonce}.json", std::process::id()));
+    let path = std::env::temp_dir().join(format!("baadash-quick-{}-{nonce}.json", std::process::id()));
     std::fs::write(&path, msg)?;
     let text = path.to_string_lossy().into_owned();
     let result = launch_app(&["--quick-file", &text]);
@@ -287,7 +287,7 @@ mod tests {
             }
             item
         }).collect();
-        let path = std::env::temp_dir().join(format!("swiftdl-quick-test-{}.json", std::process::id()));
+        let path = std::env::temp_dir().join(format!("baadash-quick-test-{}.json", std::process::id()));
         std::fs::write(&path, serde_json::to_vec(&json!({ "items": items })).unwrap()).unwrap();
         let args = vec!["app".to_string(), "--quick-file".to_string(), path.to_string_lossy().into_owned()];
         let parsed = parse_quick_arg(&args).unwrap();
@@ -312,8 +312,8 @@ fn refused(v: &Value) -> Option<String> {
     let headers = crate::manager::to_header_map(&inc.headers());
     let probe = async {
         let settings = crate::settings::native_settings()?;
-        let client = swiftdl_engine::build_client_opts(&settings.proxy, &settings.bind_address).ok()?;
-        tokio::time::timeout(std::time::Duration::from_secs(8), swiftdl_engine::probe(&client, &inc.url, &headers)).await.ok()
+        let client = baadash_engine::build_client_opts(&settings.proxy, &settings.bind_address).ok()?;
+        tokio::time::timeout(std::time::Duration::from_secs(8), baadash_engine::probe(&client, &inc.url, &headers)).await.ok()
     };
     let result = tauri::async_runtime::block_on(probe)?;
     let err = format!("{:#}", result.err()?);

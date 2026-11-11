@@ -6,10 +6,10 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
-use swiftdl_engine::header::{HeaderMap, HeaderName, HeaderValue};
-use swiftdl_engine::{CancellationToken, Outcome, Progress, Request, SpeedLimiter};
+use baadash_engine::header::{HeaderMap, HeaderName, HeaderValue};
+use baadash_engine::{CancellationToken, Outcome, Progress, Request, SpeedLimiter};
 
-/// swiftdl: a fast, resumable, multi-connection downloader.
+/// baadash: a fast, resumable, multi-connection downloader.
 #[derive(Parser)]
 #[command(version, about)]
 struct Args {
@@ -51,12 +51,12 @@ fn parse_headers(raw: &[String]) -> Result<HeaderMap> {
 
 async fn run(args: Args) -> Result<Option<PathBuf>> {
     let headers = parse_headers(&args.headers)?;
-    let client = swiftdl_engine::build_client()?;
-    let remote = swiftdl_engine::probe(&client, &args.url, &headers).await?;
+    let client = baadash_engine::build_client()?;
+    let remote = baadash_engine::probe(&client, &args.url, &headers).await?;
     let dest = match args.output {
-        Some(p) if p.is_dir() => swiftdl_engine::resolve_dest(&p, &remote.filename),
+        Some(p) if p.is_dir() => baadash_engine::resolve_dest(&p, &remote.filename),
         Some(p) => p,
-        None => swiftdl_engine::resolve_dest(&std::env::current_dir()?, &remote.filename),
+        None => baadash_engine::resolve_dest(&std::env::current_dir()?, &remote.filename),
     };
 
     eprintln!("File:   {}", dest.display());
@@ -112,7 +112,7 @@ async fn run(args: Args) -> Result<Option<PathBuf>> {
         restart: args.restart,
     };
     let limiter = Arc::new(SpeedLimiter::new(args.limit * 1024));
-    let outcome = swiftdl_engine::run(&client, &req, progress.clone(), cancel, limiter).await;
+    let outcome = baadash_engine::run(&client, &req, progress.clone(), cancel, limiter).await;
     ticker.abort();
     bar.set_position(progress.downloaded.load(Ordering::Relaxed));
     match outcome {

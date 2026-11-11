@@ -1,7 +1,7 @@
 //! Video sites (YouTube and others), through yt-dlp.
 //!
 //! These sites don't serve a plain file. YouTube's player streams through a
-//! private protocol with no download address, so SwiftDL hands these pages
+//! private protocol with no download address, so BaaDash hands these pages
 //! to yt-dlp, which keeps up with such changes, and to ffmpeg, which joins
 //! the separate video and audio streams. Both are fetched into the app's
 //! data folder the first time they're needed, and yt-dlp is kept current.
@@ -15,7 +15,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, SystemTime};
-use swiftdl_engine::{CancellationToken, Client, Outcome, Progress};
+use baadash_engine::{CancellationToken, Client, Outcome, Progress};
 
 /// Sites sent to yt-dlp instead of the regular engine.
 const SITES: &[&str] = &[
@@ -123,12 +123,12 @@ async fn ensure_tools(client: &Client, note: &Note, need_ffmpeg: bool) -> Result
     Ok(Tools { ytdlp, ffmpeg: ffmpeg_dir() })
 }
 
-/// Downloads `url` to `dest` with SwiftDL's own engine: many connections at
+/// Downloads `url` to `dest` with BaaDash's own engine: many connections at
 /// once, and resumable if the app is closed halfway. A single connection to
 /// GitHub can crawl along at a few KB/s; ffmpeg alone is over 100 MB.
 async fn fetch(client: &Client, url: &str, dest: &Path, note: &Note, label: &str) -> Result<()> {
     set_note(note, label);
-    let req = swiftdl_engine::Request {
+    let req = baadash_engine::Request {
         url: url.to_string(),
         dest: dest.to_path_buf(),
         connections: 8,
@@ -148,8 +148,8 @@ async fn fetch(client: &Client, url: &str, dest: &Path, note: &Note, label: &str
             }
         })
     };
-    let limiter = Arc::new(swiftdl_engine::SpeedLimiter::new(0));
-    let done = swiftdl_engine::run(client, &req, progress, CancellationToken::new(), limiter).await;
+    let limiter = Arc::new(baadash_engine::SpeedLimiter::new(0));
+    let done = baadash_engine::run(client, &req, progress, CancellationToken::new(), limiter).await;
     ticker.abort();
     match done? {
         Outcome::Completed => Ok(()),
@@ -395,7 +395,7 @@ async fn ytdlp_json(ytdlp: PathBuf, url: String, headers: Vec<(String, String)>,
 // ---------- YouTube: look the video up before the download is started ----------
 //
 // Most of the wait before a YouTube download is yt-dlp unscrambling the
-// video's addresses. SwiftDL starts that the moment the quality menu opens
+// video's addresses. BaaDash starts that the moment the quality menu opens
 // and saves the answer; the download then hands it to yt-dlp
 // (--load-info-json) and starts right away.
 
@@ -660,7 +660,7 @@ fn choose<'a>(info: &'a Value, format: &str) -> Option<(Option<&'a Value>, Optio
 /// speed of 8 in testing, and 32 was no faster than 16.
 const YOUTUBE_CONNECTIONS: usize = 16;
 
-/// Downloads a YouTube video straight from its saved lookup with SwiftDL's
+/// Downloads a YouTube video straight from its saved lookup with BaaDash's
 /// engine. `None` when there is no lookup or nothing in it fits, so yt-dlp
 /// should do it instead.
 async fn direct(client: &Client, job: &Job, progress: &Arc<Progress>, note: &Note, cancel: &CancellationToken) -> Result<Option<Outcome>> {
@@ -699,18 +699,18 @@ async fn direct(client: &Client, job: &Job, progress: &Arc<Progress>, note: &Not
             }
         })
     };
-    let limiter = Arc::new(swiftdl_engine::SpeedLimiter::new(0));
+    let limiter = Arc::new(baadash_engine::SpeedLimiter::new(0));
     let started = std::time::Instant::now();
     let runs = parts.iter().zip(&each).map(|((f, path), p)| {
-        let mut headers = swiftdl_engine::header::HeaderMap::new();
+        let mut headers = baadash_engine::header::HeaderMap::new();
         for (k, v) in f["http_headers"].as_object().into_iter().flatten() {
-            if let (Ok(k), Some(Ok(v))) = (k.parse::<swiftdl_engine::header::HeaderName>(), v.as_str().map(|v| v.parse())) {
+            if let (Ok(k), Some(Ok(v))) = (k.parse::<baadash_engine::header::HeaderName>(), v.as_str().map(|v| v.parse())) {
                 headers.insert(k, v);
             }
         }
-        let req = swiftdl_engine::Request { url: f["url"].as_str().unwrap_or_default().to_string(), dest: path.clone(), connections: YOUTUBE_CONNECTIONS, headers, restart: false };
+        let req = baadash_engine::Request { url: f["url"].as_str().unwrap_or_default().to_string(), dest: path.clone(), connections: YOUTUBE_CONNECTIONS, headers, restart: false };
         let (p, cancel, limiter) = (p.clone(), cancel.clone(), limiter.clone());
-        async move { swiftdl_engine::run(client, &req, p, cancel, limiter).await }
+        async move { baadash_engine::run(client, &req, p, cancel, limiter).await }
     });
     let results = futures_util::future::join_all(runs).await;
     ticker.abort();
@@ -759,7 +759,7 @@ fn attempt_output(dest: &Path) -> PathBuf {
     let mut hash = std::collections::hash_map::DefaultHasher::new();
     dest.hash(&mut hash);
     let ext = dest.extension().map(|e| e.to_string_lossy()).unwrap_or_else(|| "mp4".into());
-    dest.with_file_name(format!(".swiftdl-{:x}.{ext}", hash.finish()))
+    dest.with_file_name(format!(".baadash-{:x}.{ext}", hash.finish()))
 }
 
 /// One yt-dlp run. Returns how it ended (None when cancelled) and its errors.
@@ -986,7 +986,7 @@ mod tests {
         let output = attempt_output(&dest);
         assert_eq!(output.parent(), dest.parent());
         assert_eq!(output.extension(), dest.extension());
-        assert!(output.file_name().unwrap().to_string_lossy().starts_with(".swiftdl-"));
+        assert!(output.file_name().unwrap().to_string_lossy().starts_with(".baadash-"));
         assert!(output.file_name().unwrap().is_ascii());
     }
 
@@ -1008,12 +1008,12 @@ mod tests {
 #[cfg(test)]
 mod live {
     /// `cargo test --release live_youtube -- --ignored --nocapture` with
-    /// SWIFTDL_YT_URL and SWIFTDL_YT_OUT set. Downloads 1080p for real.
-    /// Runs the same lookup the app does, for any URL in SWIFTDL_PROBE_URL.
+    /// BAADASH_YT_URL and BAADASH_YT_OUT set. Downloads 1080p for real.
+    /// Runs the same lookup the app does, for any URL in BAADASH_PROBE_URL.
     #[test]
     #[ignore]
     fn live_probe() {
-        let url = std::env::var("SWIFTDL_PROBE_URL").unwrap();
+        let url = std::env::var("BAADASH_PROBE_URL").unwrap();
         let ytdlp = super::ytdlp_path();
         for with_js in [false, true] {
             let r = tauri::async_runtime::block_on(super::ytdlp_json(ytdlp.clone(), url.clone(), vec![], with_js));
@@ -1024,15 +1024,15 @@ mod live {
         }
     }
 
-    /// Downloads the smallest quality of SWIFTDL_DL_URL to SWIFTDL_DL_OUT through
+    /// Downloads the smallest quality of BAADASH_DL_URL to BAADASH_DL_OUT through
     /// the same code path as the app. Run it with PYTHONIOENCODING=gbk to act
     /// like a Chinese-language Windows.
     #[test]
     #[ignore]
     fn live_download() {
-        let url = std::env::var("SWIFTDL_DL_URL").unwrap();
-        let dest = std::path::PathBuf::from(std::env::var("SWIFTDL_DL_OUT").unwrap());
-        let client = swiftdl_engine::build_client().unwrap();
+        let url = std::env::var("BAADASH_DL_URL").unwrap();
+        let dest = std::path::PathBuf::from(std::env::var("BAADASH_DL_OUT").unwrap());
+        let client = baadash_engine::build_client().unwrap();
         let job = super::Job { url, format: "wv*+wa/w".into(), dest: dest.clone(), headers: vec![] };
         let r = tauri::async_runtime::block_on(super::run(&client, job, Default::default(), Default::default(), Default::default()));
         match r {
@@ -1044,9 +1044,9 @@ mod live {
     #[test]
     #[ignore]
     fn live_youtube() {
-        let url = std::env::var("SWIFTDL_YT_URL").unwrap();
-        let dest = std::path::PathBuf::from(std::env::var("SWIFTDL_YT_OUT").unwrap());
-        let client = swiftdl_engine::build_client().unwrap();
+        let url = std::env::var("BAADASH_YT_URL").unwrap();
+        let dest = std::path::PathBuf::from(std::env::var("BAADASH_YT_OUT").unwrap());
+        let client = baadash_engine::build_client().unwrap();
         let format = "bv*[height=1080][vcodec^=avc1]+ba[ext=m4a]/bv*[height=1080]+ba[ext=m4a]/bv*[height=1080]+ba/b[height=1080]/bv*[height<=1080]+ba/b".to_string();
         tauri::async_runtime::block_on(async {
             let t = std::time::Instant::now();

@@ -28,7 +28,7 @@ def make_handler(data: bytes, rate: int):
         def do_GET(self):
             if self.path == "/":
                 # A page with a link, for testing browser-extension capture.
-                page = b'<!doctype html><title>SwiftDL test</title><h1>SwiftDL test page</h1>' \
+                page = b'<!doctype html><title>BaaDash test</title><h1>BaaDash test page</h1>' \
                        b'<p><a id="dl" href="/test.bin" style="font-size:40px">Download test.bin</a></p>'
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html")

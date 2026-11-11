@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/brand/icon.svg" width="120" height="120" alt="BaaDash">
+<img src="app/src-tauri/icons/128x128.png" width="120" height="120" alt="BaaDash">
 
 # BaaDash
 
@@ -8,17 +8,14 @@
 
 免费、开源的桌面下载管理器 · Windows · macOS · Linux
 
-[![最新版本](https://img.shields.io/github/v/release/Suckmysheeep/BaaDash?style=flat-square&color=ff0077&label=release)](https://github.com/Suckmysheeep/BaaDash/releases/latest)
+[![最新版本](https://img.shields.io/github/v/release/Suckmysheeep/BaaDash?style=flat-square&color=e3fa61&label=release)](https://github.com/Suckmysheeep/BaaDash/releases/latest)
 [![平台](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-555?style=flat-square)](#下载安装)
 [![Rust](https://img.shields.io/badge/Rust-Tauri%202-dea584?style=flat-square&logo=rust&logoColor=white)](#开发与构建)
 [![许可证](https://img.shields.io/badge/license-MIT-f4c430?style=flat-square)](LICENSE)
 
 <br>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/zh-cn/main-dark.png">
-  <img src="docs/assets/zh-cn/main-light.png" width="1120" alt="BaaDash 下载列表：分类、实时进度与批量管理">
-</picture>
+<img src="docs/assets/zh-cn/main-dark.png" width="1120" alt="BaaDash 下载列表：分类、实时进度与批量管理">
 
 [官网](https://suckmysheeep.github.io/BaaDash/) · [功能](#功能) · [下载安装](#下载安装) · [浏览器扩展](#浏览器扩展) · [界面预览](#界面预览) · [开发与构建](#开发与构建) · [更新记录](CHANGELOG.md)
 
@@ -70,10 +67,7 @@ BaaDash 是一个中文优先的桌面下载管理器，基于 Rust 与 Tauri 2�
 - 按住 Alt 点击链接，可临时交给浏览器自行下载。
 
 <div align="center">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/zh-cn/extension-dark.png">
-  <img src="docs/assets/zh-cn/extension-light.png" width="320" alt="BaaDash 下载助手：独立嗅探和浮层开关">
-</picture>
+<img src="docs/assets/zh-cn/extension-dark.png" width="320" alt="BaaDash 下载助手：独立嗅探和浮层开关">
 </div>
 
 ### 一项任务，或一整个列表
@@ -132,22 +126,20 @@ Chrome 的管理页是 `chrome://extensions`，Edge 是 `edge://extensions`。�
 
 Firefox 需要 140 及以上版本（扩展使用 `data_collection_permissions` 声明），安装方式与 Chromium 系不同，目前有两条路径：
 
-1. **应用内引导**：在「设置 → 浏览器」点击 Firefox，应用会打开 Firefox 附加组件页，按页面提示安装。该条目与此前的中文分支共用同一个扩展 ID（`swiftdl@harshhh.me`），因此能被 BaaDash 的原生消息主机识别。
+1. **应用内引导**：在「设置 → 浏览器」点击 Firefox，应用会打开 Releases 页面供下载 `baadash-firefox.xpi`，随后按下一条临时载入。扩展 ID 为 `baadash@baadash.app`，与原生消息主机白名单一致。
 2. **本地安装**：从 Releases 下载 `baadash-firefox.xpi`，在 `about:debugging` → 「此 Firefox」→「临时载入附加组件」中选择该文件。未签名的附加组件在浏览器重启后失效，仅适合自测与验证。
 
 | 浏览器 | 发行包 | 安装方式 |
 | --- | --- | --- |
 | Chromium 系 | `baadash-extension.zip` | 加载已解压的扩展程序 |
-| Firefox | `baadash-firefox.xpi` | 附加组件页安装，或 `about:debugging` 临时载入 |
+| Firefox | `baadash-firefox.xpi` | `about:debugging` 临时载入 |
 
-原生消息主机按扩展 ID 白名单校验（Chromium 为 `knmfjbmojepkdiflnckpfjimfmjfcbgh`，Firefox 为 `swiftdl@harshhh.me`），换用其他来源的扩展不会被识别。扩展必须配合桌面应用使用；只看到按钮不代表已成功接管下载。
+原生消息主机按扩展 ID 白名单校验（Chromium 为 `knmfjbmojepkdiflnckpfjimfmjfcbgh`，Firefox 为 `baadash@baadash.app`），换用其他来源的扩展不会被识别。扩展必须配合桌面应用使用；只看到按钮不代表已成功接管下载。
 
 ## 界面预览
 
 <details>
-<summary><b>浅色主题、命令面板与设置</b></summary>
-
-<img src="docs/assets/zh-cn/main-light.png" width="1120" alt="BaaDash 浅色主题">
+<summary><b>命令面板、设置与浅色主题</b></summary>
 
 <img src="docs/assets/zh-cn/command-palette.png" width="1120" alt="命令面板搜索演示任务">
 
@@ -158,6 +150,8 @@ Firefox 需要 140 及以上版本（扩展使用 `data_collection_permissions` 
 <img src="docs/assets/zh-cn/settings-network.png" width="1120" alt="网络设置：系统代理与高级选项">
 
 <img src="docs/assets/zh-cn/settings-about.png" width="1120" alt="关于页及检查更新入口">
+
+<img src="docs/assets/zh-cn/main-light.png" width="1120" alt="BaaDash 浅色主题">
 
 </details>
 
@@ -197,18 +191,15 @@ cargo tauri dev
 
 构建当前平台安装包时，在 `app/src-tauri` 中执行 `cargo tauri build`。
 
-资源生成与界面验证：
+界面验证与演示图重拍：
 
 ```sh
-npm ci --prefix tools/brand
-npm run build --prefix tools/brand
-npm run check --prefix tools/brand
 npm ci --prefix tools/ui
 npm run test --prefix tools/ui
 npm run screenshots --prefix tools/ui
 ```
 
-界面测试需要 Chrome / Chromium，可通过 `CHROME` 环境变量指定路径。截图基于 `app/dist`，修改界面后请先重新构建。浏览器 API 模拟测试不能替代真实原生接管与安装升级测试，验收边界见 [验收记录](docs/LOCAL-ACCEPTANCE.md)。
+界面测试需要 Chrome / Chromium，可通过 `CHROME` 环境变量指定路径。截图基于 `app/dist`，修改界面后请先重新构建。浏览器 API 模拟测试不能替代真实原生接管与安装升级测试。
 
 <details>
 <summary><b>目录结构</b></summary>
@@ -221,8 +212,7 @@ npm run screenshots --prefix tools/ui
 | `app/ui` | TypeScript 界面与演示后端 |
 | `extension` | BaaDash 下载助手 |
 | `site` | 官网介绍与下载说明 |
-| `docs/assets` | 品牌资源与界面展示图 |
-| `tools/brand` | SVG、PNG、ICO、ICNS、BMP 生成与校验 |
+| `docs/assets` | 界面演示图 |
 | `tools/ui` | 交互测试与演示图重拍 |
 
 </details>

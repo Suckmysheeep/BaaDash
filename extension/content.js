@@ -14,8 +14,8 @@ function pickStream(items) {
 // Everything lives in a closed shadow root so page styles can't touch it.
 
 (() => {
-  if (window.__swiftdlLoaded) return;
-  window.__swiftdlLoaded = true;
+  if (window.__baadashLoaded) return;
+  window.__baadashLoaded = true;
 
   // Alt+click: skip BaaDash for this download.
   document.addEventListener(
@@ -49,7 +49,7 @@ function pickStream(items) {
 
   const MIN_W = 200,
     MIN_H = 112;
-  // Video sites SwiftDL downloads through yt-dlp: the page itself is sent,
+  // Video sites BaaDash downloads through yt-dlp: the page itself is sent,
   // and the quality is chosen in BaaDash.
   const VIDEO_SITE =
     /(^|\.)(youtube\.com|youtube-nocookie\.com|vimeo\.com|x\.com|twitter\.com|reddit\.com|instagram\.com|tiktok\.com|facebook\.com|twitch\.tv|dailymotion\.com|bilibili\.com)$/i;
@@ -68,7 +68,7 @@ function pickStream(items) {
     open = false;
 
   function build() {
-    host = document.createElement("swiftdl-overlay");
+    host = document.createElement("baadash-overlay");
     host.style.cssText =
       "all:initial;position:fixed;inset:0 auto auto 0;width:0;height:0;z-index:2147483647;";
     root = host.attachShadow({ mode: "closed" });
@@ -325,7 +325,7 @@ function pickStream(items) {
       items.unshift({ url: src, kind: "file", mime: "video/mp4", size: 0 });
     const files = items.filter((m) => m.kind === "file");
     // A player loads its main playlist first, then one per quality: the
-    // oldest stream is the main one, which lets SwiftDL offer every quality.
+    // oldest stream is the main one, which lets BaaDash offer every quality.
     const stream = pickStream(items);
     const name = title();
     let html = "";
@@ -375,13 +375,13 @@ function pickStream(items) {
   const askPage = () =>
     new Promise((resolve) => {
       const on = (e) => {
-        if (e.source === window && e.data?.swiftdl === "yt-info") {
+        if (e.source === window && e.data?.baadash === "yt-info") {
           removeEventListener("message", on);
           resolve(e.data);
         }
       };
       addEventListener("message", on);
-      postMessage({ swiftdl: "yt-ask" }, "*");
+      postMessage({ baadash: "yt-ask" }, "*");
       setTimeout(() => {
         removeEventListener("message", on);
         resolve(null);

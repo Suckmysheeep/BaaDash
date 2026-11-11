@@ -7,6 +7,7 @@ mod manager;
 mod log;
 mod gif;
 mod media;
+mod migrate;
 mod native_host;
 mod settings;
 mod torrent;
@@ -28,7 +29,7 @@ pub fn show_main_window(app: &AppHandle) {
     }
 }
 
-/// SwiftDL lives in the tray like IDM: closing the main window keeps
+/// BaaDash lives in the tray like IDM: closing the main window keeps
 /// downloads (and browser integration) running.
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "打开 BaaDash", true, None::<&str>)?;
@@ -59,6 +60,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 
 fn main() {
     log::install_panic_hook();
+    migrate::run();
     let args: Vec<String> = std::env::args().collect();
     if native_host::is_native_host_launch(&args) {
         native_host::run();
@@ -83,7 +85,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
-            log::line(&format!("SwiftDL {} starting on {} {}", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH));
+            log::line(&format!("BaaDash {} starting on {} {}", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH));
             let data_dir = app.path().app_data_dir()?;
             let downloads = app.path().download_dir().unwrap_or_else(|_| data_dir.join("Downloads"));
             let mgr = DownloadManager::new(app.handle().clone(), data_dir.clone(), downloads)?;
@@ -173,7 +175,7 @@ fn main() {
             _ => {}
         })
         .build(tauri::generate_context!())
-        .expect("error while starting SwiftDL")
+        .expect("error while starting BaaDash")
         .run(|_app, _event| {
             // macOS hands over magnet links and .torrent files as an event,
             // not as arguments.

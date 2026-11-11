@@ -134,7 +134,7 @@ jobs:
           # (keep in step with app/src-tauri/build.rs).
           cp -r extension firefox
           jq 'del(.key) | .background = {scripts: ["background.js"]}
-              | .browser_specific_settings = {gecko: {id: "swiftdl@harshhh.me", strict_min_version: "140.0",
+              | .browser_specific_settings = {gecko: {id: "baadash@baadash.app", strict_min_version: "140.0",
                   data_collection_permissions: {required: ["none"]}}}' \
             extension/manifest.json > firefox/manifest.json
           (cd firefox && zip -r ../baadash-firefox.xpi .)
@@ -151,8 +151,6 @@ jobs:
           node-version: 22
       - run: npm ci --prefix app
       - run: npm run build --prefix app
-      - run: npm ci --prefix tools/brand
-      - run: npm run check --prefix tools/brand
       - run: npm ci --prefix tools/ui
       - run: npm run test --prefix tools/ui
 

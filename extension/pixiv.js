@@ -1,7 +1,7 @@
 // Pixiv: current artwork only. Static works use their original images;
 // ugoira works carry the original timed-frame ZIP and metadata to the app.
 (() => {
-  const ui = window.__swiftdlImageUI;
+  const ui = window.__baadashImageUI;
   if (!ui) return;
   const cache = new Map();
 

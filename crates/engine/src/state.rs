@@ -1,4 +1,4 @@
-//! The resume file (`<name>.swiftdl`) that sits next to the `.part` file.
+//! The resume file (`<name>.baadash`) that sits next to the `.part` file.
 //! It records which byte ranges are still missing, so a crash, Ctrl+C or
 //! dropped network never costs more than the last second of progress.
 
@@ -25,7 +25,7 @@ impl SavedState {
     /// Writes to a temp file first, then renames, so the state file is never
     /// left half-written.
     pub fn save(&self, path: &Path) -> Result<()> {
-        let tmp = path.with_extension("swiftdl.tmp");
+        let tmp = path.with_extension("baadash.tmp");
         std::fs::write(&tmp, serde_json::to_vec(self)?)?;
         std::fs::rename(&tmp, path)?;
         Ok(())

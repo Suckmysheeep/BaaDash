@@ -1,6 +1,6 @@
 //! Local HTTP fixtures exercise bytes on disk, not only range parser helpers.
 use std::{fs, io::{Read, Write}, net::TcpListener, path::PathBuf, sync::{Arc, atomic::{AtomicBool, Ordering}}, thread, time::{Duration, SystemTime, UNIX_EPOCH}};
-use swiftdl_engine::{Client, run, CancellationToken, Outcome, Progress, Request, SpeedLimiter, header::HeaderMap};
+use baadash_engine::{Client, run, CancellationToken, Outcome, Progress, Request, SpeedLimiter, header::HeaderMap};
 
 struct Fixture { url: String, data: Arc<Vec<u8>>, stop: Arc<AtomicBool>, worker: Option<thread::JoinHandle<()>> }
 impl Fixture {
@@ -46,7 +46,7 @@ async fn download(f:&Fixture,dest:PathBuf)->anyhow::Result<Outcome>{
 async fn truncated_resume_file_is_restarted_and_bytes_match(){
     let f=Fixture::new();let dir=folder();let dest=dir.join("file.bin");
     fs::write(dir.join("file.bin.part"),b"truncated").unwrap();
-    fs::write(dir.join("file.bin.swiftdl"),serde_json::json!({"url":f.url,"size":f.data.len(),"etag":"\"fixture-v1\"","last_modified":null,"segments":[[1000,f.data.len()]]}).to_string()).unwrap();
+    fs::write(dir.join("file.bin.baadash"),serde_json::json!({"url":f.url,"size":f.data.len(),"etag":"\"fixture-v1\"","last_modified":null,"segments":[[1000,f.data.len()]]}).to_string()).unwrap();
     assert_eq!(download(&f,dest.clone()).await.unwrap(),Outcome::Completed);assert_eq!(fs::read(&dest).unwrap(),*f.data);fs::remove_dir_all(dir).unwrap();
 }
 #[tokio::test]

@@ -6,7 +6,7 @@
 use std::fs;
 use std::path::Path;
 
-const FIREFOX_ID: &str = "swiftdl@harshhh.me"; // also in src/browser.rs
+const FIREFOX_ID: &str = "baadash@baadash.app"; // also in src/browser.rs
 
 fn main() {
     let src = Path::new("../../extension");
@@ -23,7 +23,7 @@ fn main() {
     m.insert(
         "browser_specific_settings".into(),
         // Mozilla requires new add-ons to declare the data they collect. The
-        // add-on only hands downloads (and their cookies) to SwiftDL on the
+        // add-on only hands downloads (and their cookies) to BaaDash on the
         // same computer; nothing is sent anywhere else. Needs Firefox 140+.
         serde_json::json!({ "gecko": {
             "id": FIREFOX_ID,

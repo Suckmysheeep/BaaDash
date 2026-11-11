@@ -3,7 +3,7 @@
 //! A torrent is read first for its file list (the New download window lets
 //! the user pick files), then run as a download like any other: progress,
 //! speed, pause and resume. When it finishes it stops sharing, which is what
-//! people expect from a download manager. SwiftDL also registers itself as
+//! people expect from a download manager. BaaDash also registers itself as
 //! the computer's handler for magnet links and .torrent files.
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
-use swiftdl_engine::header::HeaderMap;
-use swiftdl_engine::{CancellationToken, Client, Outcome, Progress};
+use baadash_engine::header::HeaderMap;
+use baadash_engine::{CancellationToken, Client, Outcome, Progress};
 use tokio::sync::OnceCell;
 
 /// A magnet link, or the address or path of a .torrent file.
@@ -100,7 +100,7 @@ pub enum Seed {
     Stop,
     /// Keep sharing until this much has been uploaded, relative to its size.
     Ratio(f64),
-    /// Keep sharing while SwiftDL is running.
+    /// Keep sharing while BaaDash is running.
     Forever,
 }
 
@@ -194,7 +194,7 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
                     }
                     let _ = session.delete(handle.id().into(), false).await;
                 }
-                // Forever: the torrent stays in the session until SwiftDL quits.
+                // Forever: the torrent stays in the session until BaaDash quits.
             });
         }
         // Otherwise stop sharing and let go of the files; what was
@@ -208,9 +208,9 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
 
 // ---------- the computer's handler for magnet links and .torrent files ----------
 
-/// Makes SwiftDL open magnet links and .torrent files. Windows won't let an
+/// Makes BaaDash open magnet links and .torrent files. Windows won't let an
 /// app override a choice the user already made for another program; there
-/// SwiftDL is listed in Default apps so it can be picked.
+/// BaaDash is listed in Default apps so it can be picked.
 pub fn register_handlers() -> Result<()> {
     #[cfg(windows)]
     {
@@ -230,22 +230,22 @@ pub fn register_handlers() -> Result<()> {
         magnet.create_subkey(r"shell\open\command")?.0.set_value("", &open)?;
 
         // .torrent files
-        let progid = classes.create_subkey("SwiftDL.Torrent")?.0;
+        let progid = classes.create_subkey("BaaDash.Torrent")?.0;
         progid.set_value("", &"Torrent file")?;
         progid.create_subkey("DefaultIcon")?.0.set_value("", &icon)?;
         progid.create_subkey(r"shell\open\command")?.0.set_value("", &open)?;
         let ext = classes.create_subkey(".torrent")?.0;
-        ext.set_value("", &"SwiftDL.Torrent")?;
+        ext.set_value("", &"BaaDash.Torrent")?;
         ext.set_value("Content Type", &"application/x-bittorrent")?;
-        ext.create_subkey("OpenWithProgids")?.0.set_value("SwiftDL.Torrent", &"")?;
+        ext.create_subkey("OpenWithProgids")?.0.set_value("BaaDash.Torrent", &"")?;
 
         // Listed in Settings > Apps > Default apps.
-        let caps = hkcu.create_subkey(r"Software\SwiftDL\Capabilities")?.0;
+        let caps = hkcu.create_subkey(r"Software\BaaDash\Capabilities")?.0;
         caps.set_value("ApplicationName", &"BaaDash")?;
         caps.set_value("ApplicationDescription", &"支持多连接与断点续传的开源下载管理器")?;
-        caps.create_subkey("FileAssociations")?.0.set_value(".torrent", &"SwiftDL.Torrent")?;
+        caps.create_subkey("FileAssociations")?.0.set_value(".torrent", &"BaaDash.Torrent")?;
         caps.create_subkey("URLAssociations")?.0.set_value("magnet", &"magnet")?;
-        hkcu.create_subkey(r"Software\RegisteredApplications")?.0.set_value("SwiftDL", &r"Software\SwiftDL\Capabilities")?;
+        hkcu.create_subkey(r"Software\RegisteredApplications")?.0.set_value("BaaDash", &r"Software\BaaDash\Capabilities")?;
 
         #[link(name = "shell32")]
         unsafe extern "system" {
@@ -262,14 +262,60 @@ pub fn register_handlers() -> Result<()> {
 }
 
 /// Linux: a hidden desktop entry for magnet links and .torrent files, set
-/// as the default with xdg-mime. Opening one starts `SwiftDL --open <it>`.
+/// Clears file-type registrations left by the pre-rename SwiftDL identifiers.
+pub fn unregister_legacy() {
+    #[cfg(windows)]
+    {
+        use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
+        use winreg::RegKey;
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let _ = hkcu.delete_subkey_all(r"Software\Classes\SwiftDL.Torrent");
+        let _ = hkcu.delete_subkey_all(r"Software\SwiftDL");
+        if let Ok(k) = hkcu.open_subkey_with_flags(r"Software\RegisteredApplications", KEY_SET_VALUE) {
+            let _ = k.delete_value("SwiftDL");
+        }
+        if let Ok(k) = hkcu.open_subkey_with_flags(r"Software\Classes\.torrent\OpenWithProgids", KEY_SET_VALUE) {
+            let _ = k.delete_value("SwiftDL.Torrent");
+        }
+        let legacy_default = hkcu
+            .open_subkey(r"Software\Classes\.torrent")
+            .and_then(|k| k.get_value::<String, _>(""))
+            .ok()
+            .as_deref()
+            == Some("SwiftDL.Torrent");
+        if legacy_default {
+            if let Ok(k) = hkcu.open_subkey_with_flags(r"Software\Classes\.torrent", KEY_SET_VALUE) {
+                let _ = k.delete_value("");
+            }
+        }
+        let legacy_magnet = hkcu
+            .open_subkey(r"Software\Classes\magnet\shell\open\command")
+            .and_then(|k| k.get_value::<String, _>(""))
+            .map(|c| c.to_lowercase().contains("swiftdl"))
+            .unwrap_or(false);
+        if legacy_magnet {
+            let _ = hkcu.delete_subkey_all(r"Software\Classes\magnet");
+        }
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let apps = std::env::var_os("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")));
+        if let Some(apps) = apps {
+            let _ = std::fs::remove_file(apps.join("applications/swiftdl-handler.desktop"));
+        }
+    }
+}
+
+/// as the default with xdg-mime. Opening one starts `BaaDash --open <it>`.
 #[cfg(target_os = "linux")]
 mod linux {
     use anyhow::Result;
     use std::path::PathBuf;
     use std::process::Command;
 
-    const ENTRY: &str = "swiftdl-handler.desktop";
+    const ENTRY: &str = "baadash-handler.desktop";
     const TYPES: [&str; 2] = ["x-scheme-handler/magnet", "application/x-bittorrent"];
 
     pub fn register() -> Result<()> {
@@ -285,7 +331,7 @@ mod linux {
         let exec = exe.to_string_lossy().replace('\\', "\\\\").replace('"', "\\\"");
         let entry = format!(
             "[Desktop Entry]\nType=Application\nName=BaaDash\nComment=使用 BaaDash打开种子和磁力链接\n\
-             Exec=\"{exec}\" --open %u\nIcon=swiftdl\nTerminal=false\nNoDisplay=true\nMimeType={};\n",
+             Exec=\"{exec}\" --open %u\nIcon=baadash\nTerminal=false\nNoDisplay=true\nMimeType={};\n",
             TYPES.join(";")
         );
         std::fs::write(apps.join(ENTRY), entry)?;
@@ -298,7 +344,7 @@ mod linux {
 }
 
 /// macOS: the app bundle declares magnet links and .torrent files
-/// (Info.plist); this makes SwiftDL their default handler, and the system
+/// (Info.plist); this makes BaaDash their default handler, and the system
 /// hands them over as "opened" events (see main.rs).
 #[cfg(target_os = "macos")]
 mod macos {
@@ -324,7 +370,7 @@ mod macos {
     }
 
     pub fn set_default_handler() {
-        let (scheme, uti, app) = (cf("magnet"), cf("org.bittorrent.torrent"), cf("com.swiftdl.app"));
+        let (scheme, uti, app) = (cf("magnet"), cf("org.bittorrent.torrent"), cf("com.baadash.app"));
         unsafe {
             LSSetDefaultHandlerForURLScheme(scheme, app);
             LSSetDefaultRoleHandlerForContentType(uti, ALL_ROLES, app);
@@ -367,13 +413,13 @@ mod tests {
     #[test]
     fn finds_the_link_to_open() {
         let args = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        assert_eq!(parse_open_arg(&args(&["swiftdl", "--open", "magnet:?xt=urn:btih:abc"])).unwrap().url, "magnet:?xt=urn:btih:abc");
-        assert!(parse_open_arg(&args(&["swiftdl", "--add", "xyz"])).is_none());
+        assert_eq!(parse_open_arg(&args(&["baadash", "--open", "magnet:?xt=urn:btih:abc"])).unwrap().url, "magnet:?xt=urn:btih:abc");
+        assert!(parse_open_arg(&args(&["baadash", "--add", "xyz"])).is_none());
     }
 }
 
 /// Downloads from the real BitTorrent network for a while; run on demand:
-/// `cargo test -p swiftdl-app live_torrent -- --ignored --nocapture`
+/// `cargo test -p baadash-app live_torrent -- --ignored --nocapture`
 #[cfg(test)]
 mod live {
     use super::*;
@@ -382,14 +428,14 @@ mod live {
     #[ignore]
     fn live_torrent() {
         tauri::async_runtime::block_on(async {
-            let client = swiftdl_engine::build_client().unwrap();
+            let client = baadash_engine::build_client().unwrap();
             let url = "https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-desktop-amd64.iso.torrent";
             let info = probe(&client, url, &HeaderMap::new()).await.unwrap();
             println!("{} · {} file(s) · {} bytes", info.name, info.files.len(), info.size);
             let progress = Arc::new(Progress::default());
             let note = crate::media::Note::default();
             let cancel = CancellationToken::new();
-            let dir = std::env::temp_dir().join("swiftdl-torrent-test");
+            let dir = std::env::temp_dir().join("baadash-torrent-test");
             let job = Job { url: url.into(), headers: HeaderMap::new(), dir: dir.clone(), files: vec![], seed: Seed::Stop };
             let (p, n, c) = (progress.clone(), note.clone(), cancel.clone());
             let watch = tauri::async_runtime::spawn(async move {

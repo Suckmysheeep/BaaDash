@@ -105,7 +105,7 @@ try {
   await ext.route("**/fixture", (r) =>
     r.fulfill({
       contentType: "text/html",
-      body: `<style>body{margin:0}video{position:absolute;left:40px;top:40px;width:640px;height:360px}img{position:absolute;width:640px;height:360px;left:40px;top:40px}#photo{top:430px;width:300px;height:180px}</style><video id="v"></video><img id="poster" src="/docs/assets/brand/social-preview.png"><img id="photo" src="/docs/assets/brand/social-preview.png"><script>Object.defineProperty(document.querySelector('video'),'currentSrc',{value:'https://example.com/video.mp4',configurable:true});</script>`,
+      body: `<style>body{margin:0}video{position:absolute;left:40px;top:40px;width:640px;height:360px}img{position:absolute;width:640px;height:360px;left:40px;top:40px}#photo{top:430px;width:300px;height:180px}</style><video id="v"></video><img id="poster" src="/docs/assets/app-dark.png"><img id="photo" src="/docs/assets/app-dark.png"><script>Object.defineProperty(document.querySelector('video'),'currentSrc',{value:'https://example.com/video.mp4',configurable:true});</script>`,
     }),
   );
   await ext.goto(origin + "/fixture");
@@ -119,7 +119,7 @@ try {
   await ext.waitForTimeout(100);
   await ext.mouse.move(200, 500);
   await ext.waitForTimeout(200);
-  assert.equal(await ext.locator("swiftdl-image-button").count(), 0);
+  assert.equal(await ext.locator("baadash-image-button").count(), 0);
   results.push("Images have no overlay by default");
   await ext.evaluate(() => window.__setPrefs({ imageButtons: true }));
   await ext.mouse.move(210, 501);
@@ -136,7 +136,7 @@ try {
       () =>
         !window.__testShadows.some(
           (r) =>
-            r.host.tagName === "SWIFTDL-IMAGE-BUTTON" &&
+            r.host.tagName === "BAADASH-IMAGE-BUTTON" &&
             r.querySelector("button.on"),
         ),
     ),

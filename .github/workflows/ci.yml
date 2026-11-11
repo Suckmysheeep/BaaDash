@@ -28,7 +28,7 @@ jobs:
         working-directory: app
         run: npm ci && npm run build
       - run: cargo test --workspace
-      - run: cargo build -p swiftdl-app
+      - run: cargo build -p baadash-app
       - uses: actions/upload-artifact@v4
         with:
           name: resolved-lockfile
@@ -53,7 +53,7 @@ jobs:
       - name: Build the interface
         working-directory: app
         run: npm ci && npm run build
-      - run: cargo check -p swiftdl-app
+      - run: cargo check -p baadash-app
 
   windows:
     runs-on: windows-latest
@@ -67,15 +67,15 @@ jobs:
       - run: npm ci --prefix app
       - run: npm run build --prefix app
       - run: cargo test --workspace
-      - run: cargo check -p swiftdl-app
+      - run: cargo check -p baadash-app
 
       - name: Build native Windows review binary
-        run: cargo build -p swiftdl-app --release --features tauri/custom-protocol
+        run: cargo build -p baadash-app --release --features tauri/custom-protocol
       - name: Prepare native review files
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force target/native-review | Out-Null
-          Copy-Item target/release/swiftdl-app.exe target/native-review/
+          Copy-Item target/release/baadash.exe target/native-review/
           Copy-Item extension target/native-review/extension -Recurse
           Copy-Item app/src-tauri/gen/extension-firefox target/native-review/extension-firefox -Recurse
       - uses: actions/upload-artifact@v4
@@ -91,9 +91,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci --prefix tools/brand
-      - run: npm run build --prefix tools/brand
-      - run: npm run check --prefix tools/brand
       - run: npm ci --prefix app
       - run: npm run build --prefix app
       - run: npm ci --prefix tools/ui

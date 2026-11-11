@@ -80,6 +80,6 @@ console.log(
 
 // A normal browser download loses its navigation fragment; remember the marked tab URL.
 prefs.enabled = true;
-listeners.tabCreated({pendingUrl:"https://files.test/file.zip#swiftdl-browser"});
+listeners.tabCreated({pendingUrl:"https://files.test/file.zip#baadash-browser"});
 await listeners.download({id:99,url:"https://files.test/file.zip",state:"in_progress"});
 console.log("PASS: browser fallback survives fragment removal without pausing or re-intercepting.");

@@ -5,5 +5,4 @@ node_modules/
 /.claude/
 node_modules/
 dist/
-
-/video/out/
+/tools/ui/.artifacts/

@@ -1,7 +1,7 @@
 // Shared, site-independent image download button. Site adapters may replace
 // URL resolution, but positioning and native messaging stay standard DOM code.
 (() => {
-  if (window.__swiftdlImageUI) return;
+  if (window.__baadashImageUI) return;
 
   const cleanName = (value) =>
     String(value || "image")
@@ -39,8 +39,8 @@
   const ICON = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg>`;
 
   function attach(resolve, { collect = true, animation = null } = {}) {
-    if (window.__swiftdlImageAttached) return;
-    window.__swiftdlImageAttached = true;
+    if (window.__baadashImageAttached) return;
+    window.__baadashImageAttached = true;
     let host,
       root,
       button,
@@ -50,7 +50,7 @@
       busy = false;
 
     function build() {
-      host = document.createElement("swiftdl-image-button");
+      host = document.createElement("baadash-image-button");
       host.style.cssText =
         "all:initial;position:fixed;inset:0 auto auto 0;width:0;height:0;z-index:2147483647";
       root = host.attachShadow({ mode: "closed" });
@@ -229,7 +229,7 @@
       });
   }
 
-  window.__swiftdlImageUI = {
+  window.__baadashImageUI = {
     attach,
     directItem,
     cleanName,

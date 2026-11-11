@@ -1,4 +1,4 @@
-//! Tells the user about a newer SwiftDL release on GitHub, and installs it.
+//! Tells the user about a newer BaaDash release on GitHub, and installs it.
 //!
 //! On Windows the installer is downloaded and run in place; elsewhere the
 //! download opens in the browser, since a .dmg or Linux package needs the
@@ -7,7 +7,7 @@
 use anyhow::{Context, Result, bail};
 use serde::Serialize;
 use serde_json::Value;
-use swiftdl_engine::Client;
+use baadash_engine::Client;
 
 const LATEST: &str = "https://api.github.com/repos/Suckmysheeep/BaaDash/releases/latest";
 
@@ -47,7 +47,7 @@ fn pick_asset(names: &[(String, String)]) -> Option<String> {
 pub async fn check(client: &Client) -> Result<Option<Update>> {
     let body = client
         .get(LATEST)
-        .header("User-Agent", "SwiftDL")
+        .header("User-Agent", "BaaDash")
         .header("Accept", "application/vnd.github+json")
         .send()
         .await?
@@ -74,14 +74,14 @@ pub async fn check(client: &Client) -> Result<Option<Update>> {
 
 /// Downloads the Windows installer and starts it. The caller then quits the
 /// app so the installer can replace it; `/P` shows only a progress bar, `/UPDATE` keeps
-/// the user's shortcuts, and `/R` starts SwiftDL again afterwards.
+/// the user's shortcuts, and `/R` starts BaaDash again afterwards.
 #[cfg(windows)]
 pub async fn run_installer(client: &Client, url: &str) -> Result<()> {
     if !url.starts_with("https://github.com/Suckmysheeep/BaaDash/releases/download/") {
         bail!("refusing to install from {url}");
     }
-    let bytes = client.get(url).header("User-Agent", "SwiftDL").send().await?.error_for_status()?.bytes().await?;
-    let path = std::env::temp_dir().join(url.rsplit('/').next().unwrap_or("SwiftDL-setup.exe"));
+    let bytes = client.get(url).header("User-Agent", "BaaDash").send().await?.error_for_status()?.bytes().await?;
+    let path = std::env::temp_dir().join(url.rsplit('/').next().unwrap_or("BaaDash-setup.exe"));
     std::fs::write(&path, &bytes).with_context(|| format!("could not save {}", path.display()))?;
     std::process::Command::new(&path).args(["/P", "/R", "/UPDATE"]).spawn().context("could not start the installer")?;
     Ok(())

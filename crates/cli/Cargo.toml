@@ -1,16 +1,16 @@
 [package]
-name = "swiftdl-cli"
-description = "Command-line front end for the swiftdl engine"
+name = "baadash-cli"
+description = "Command-line front end for the baadash engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "swiftdl"
+name = "baadash"
 path = "src/main.rs"
 
 [dependencies]
-swiftdl-engine = { path = "../engine" }
+baadash-engine = { path = "../engine" }
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
 indicatif = "0.18.6"

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
-use swiftdl_engine::Client;
+use baadash_engine::Client;
 use crate::media::Note;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -98,7 +98,7 @@ impl Drop for TempFolder {
 fn ugoira(ffmpeg: &Path, source: &Path, dest: &Path, options: &GifOptions) -> Result<ExitStatus> {
     let frames = options.frames.as_deref().context("Pixiv 动图缺少帧信息")?;
     let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
-    let temp = TempFolder(std::env::temp_dir().join(format!("swiftdl-ugoira-{}-{nonce}", std::process::id())));
+    let temp = TempFolder(std::env::temp_dir().join(format!("baadash-ugoira-{}-{nonce}", std::process::id())));
     std::fs::create_dir_all(&temp.0)?;
     let mut archive = zip::ZipArchive::new(std::fs::File::open(source)?)?;
     let mut script = String::from("ffconcat version 1.0\n");
@@ -143,7 +143,7 @@ pub async fn convert(client: &Client, note: &Note, input: &Path, options: GifOpt
     let ffmpeg = crate::media::ffmpeg_path().context("GIF 转换需要 FFmpeg，请安装后重试")?;
     let parent = input.parent().unwrap_or_else(|| Path::new("."));
     let stem = input.file_stem().map(|s| s.to_string_lossy()).unwrap_or_else(|| "animation".into());
-    let output = swiftdl_engine::resolve_dest(parent, &format!("{stem}.gif"));
+    let output = baadash_engine::resolve_dest(parent, &format!("{stem}.gif"));
     crate::media::set_note(note, "正在转换 GIF");
 
     let source = input.to_path_buf();

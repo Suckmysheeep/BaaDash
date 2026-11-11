@@ -12,7 +12,7 @@ declare global {
 
 (() => {
   if (window.__TAURI__) return;
-  // ?video: the launch film drives this page frame by frame (video/launch.html),
+  // ?video: manual simulation mode driven by window.__video.step(),
   // so nothing runs on timers and answers come back at once.
   const VIDEO = location.search.includes("video");
 
@@ -345,7 +345,7 @@ declare global {
     open_folder: () => {},
     open_url: () => {},
     open_extension_folder: () => {},
-    extension_dir: () => "C:\\Users\\you\\AppData\\Local\\SwiftDL\\extension",
+    extension_dir: () => "C:\\Users\\you\\AppData\\Local\\BaaDash\\extension",
     default_dir: ({ filename }) => dirFor(catFor(filename)),
     // ?noext previews the not-connected case.
     integration_status: () =>
@@ -450,11 +450,8 @@ declare global {
     forget_confirm: () => {},
     probe_note: () => null,
     show_main: () => {},
-    check_update: () => ({
-      version: "0.4.0",
-      page: "https://github.com/Suckmysheeep/BaaDash/releases/latest",
-      asset: null,
-    }),
+    // Like the Rust backend, only strictly newer releases are reported.
+    check_update: () => null,
     install_update: () => {},
     is_media_url: ({ url }) =>
       /(^|\.)(youtube\.com|youtu\.be|vimeo\.com|media\.example\.net)\//.test(

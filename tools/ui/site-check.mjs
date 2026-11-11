@@ -33,11 +33,13 @@ try {
           imgs.filter((i) => !i.complete || !i.naturalWidth).map((i) => i.src),
         );
       assert.deepEqual(missing, []);
-      if (name === "index" && width === 1440)
+      if (name === "index" && width === 1440) {
+        fs.mkdirSync(path.join(root, "tools/ui/.artifacts"), { recursive: true });
         await p.screenshot({
-          path: path.join(root, "docs/assets/brand/site-preview.png"),
+          path: path.join(root, "tools/ui/.artifacts/site-preview.png"),
           fullPage: true,
         });
+      }
       await p.close();
     }
   const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
@@ -47,16 +49,6 @@ try {
   console.log(
     "PASS: 3 site pages × desktop/mobile, no overflow or missing assets; README image paths resolve.",
   );
-  const v = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-  await v.goto(origin + "/video/launch.html");
-  await v.evaluate(() => window.ready);
-  for (const t of [2, 10, 20, 29, 38, 45]) {
-    await v.evaluate((t) => window.seek(t), t);
-    await v.screenshot({
-      path: path.join(root, `docs/assets/brand/video-frame-${t}.png`),
-    });
-  }
-  console.log("PASS: all six demo film scenes render with local assets.");
 } finally {
   await browser.close();
   server.close();

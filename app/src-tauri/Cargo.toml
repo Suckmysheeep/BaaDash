@@ -1,12 +1,12 @@
 [package]
-name = "swiftdl-app"
+name = "baadash-app"
 description = "BaaDash桌面下载管理器"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "swiftdl-app"
+name = "baadash"
 path = "src/main.rs"
 
 [build-dependencies]
@@ -25,7 +25,7 @@ os_pipe = "1"
 roxmltree = "0.20"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
-swiftdl-engine = { path = "../../crates/engine" }
+baadash-engine = { path = "../../crates/engine" }
 tauri = { version = "2.12.5", features = ["tray-icon"] }
 tauri-plugin-dialog = "2.8.4"
 tauri-plugin-notification = "2.8.0"

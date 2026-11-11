@@ -444,6 +444,60 @@ dependencies = [
 ]
 
 [[package]]
+name = "baadash-app"
+version = "0.4.0"
+dependencies = [
+ "aes",
+ "anyhow",
+ "baadash-engine",
+ "base64 0.23.1",
+ "cbc",
+ "futures-util",
+ "librqbit",
+ "os_pipe",
+ "roxmltree",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tauri-plugin-single-instance",
+ "tokio",
+ "url",
+ "winreg",
+ "zip",
+]
+
+[[package]]
+name = "baadash-cli"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "baadash-engine",
+ "clap",
+ "indicatif",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "baadash-engine"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "futures-util",
+ "percent-encoding",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "backon"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5025,60 +5079,6 @@ dependencies = [
  "base64 0.21.7",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "swiftdl-app"
-version = "0.4.0"
-dependencies = [
- "aes",
- "anyhow",
- "base64 0.23.1",
- "cbc",
- "futures-util",
- "librqbit",
- "os_pipe",
- "roxmltree",
- "serde",
- "serde_json",
- "sha2",
- "swiftdl-engine",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tauri-plugin-single-instance",
- "tokio",
- "url",
- "winreg",
- "zip",
-]
-
-[[package]]
-name = "swiftdl-cli"
-version = "0.4.0"
-dependencies = [
- "anyhow",
- "clap",
- "indicatif",
- "swiftdl-engine",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "swiftdl-engine"
-version = "0.4.0"
-dependencies = [
- "anyhow",
- "futures-util",
- "percent-encoding",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tokio-util",
 ]
 
 [[package]]

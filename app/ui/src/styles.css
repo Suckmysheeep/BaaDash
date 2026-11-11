@@ -4,7 +4,7 @@
    blue used only for progress, selection and focus. Restrained form surfaces; functional icons use clear monochrome strokes. */
 
 @font-face {
-  font-family: "SwiftDL Noto Sans SC";
+  font-family: "BaaDash Noto Sans SC";
   src: url("/fonts/NotoSansSC-Variable.woff2") format("woff2");
   font-style: normal;
   font-weight: 100 900;
@@ -44,10 +44,10 @@
     0 18px 48px -8px rgba(15, 15, 25, 0.2);
   --kbd-bg: rgba(15, 15, 25, 0.05);
   --font:
-    "SwiftDL Noto Sans SC", "Microsoft YaHei UI", "PingFang SC",
+    "BaaDash Noto Sans SC", "Microsoft YaHei UI", "PingFang SC",
     "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --font-display:
-    "SwiftDL Noto Sans SC", "Microsoft YaHei UI", "PingFang SC",
+    "BaaDash Noto Sans SC", "Microsoft YaHei UI", "PingFang SC",
     "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
 }
@@ -510,7 +510,6 @@ kbd {
   container-type: inline-size;
 }
 @container (max-width: 760px) {
-  .r-meta .m-size,
   .r-meta .cat {
     display: none;
   }
@@ -2207,9 +2206,6 @@ code {
   .ghost-btn span {
     display: none;
   }
-  .r-meta .m-size {
-    display: none;
-  }
 }
 ::-webkit-scrollbar {
   width: 10px;
@@ -2428,7 +2424,7 @@ code {
 
 
 
-/* BaaDash UI system: disclosure, form fields and navigation. See docs/UI-SPEC.md. */
+/* BaaDash UI system: disclosure, form fields and navigation. */
 .lucide-icon { vertical-align:middle; user-select:none; transform-origin:center; }
 .settings { width:860px; max-width:calc(100vw - 40px); height:600px; max-height:calc(100vh - 48px); }
 .settings form { grid-template-columns:184px minmax(0,1fr); }

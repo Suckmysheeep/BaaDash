@@ -2,9 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { start, root, extensionMock } from "./runtime.mjs";
-const require = createRequire(
-    new URL("../brand/package.json", import.meta.url),
-  ),
+const require = createRequire(new URL("./package.json", import.meta.url)),
   sharp = require("sharp");
 const { browser, server, origin } = await start();
 const report = [],
@@ -30,20 +28,39 @@ async function shot(p, file, opts = {}) {
   await p.screenshot({ path: path.join(root, file), ...opts });
   report.push(file);
 }
+// README images cannot be styled by CSS; bake the site's 12px corner radius
+// (24px at 2x capture) into the alpha channel so GitHub shows rounded windows.
+async function round(file, r = 24) {
+  const p = path.join(root, file);
+  const { width, height } = await sharp(p).metadata();
+  const mask = Buffer.from(
+    `<svg width="${width}" height="${height}"><rect width="${width}" height="${height}" rx="${r}" fill="#fff"/></svg>`,
+  );
+  fs.writeFileSync(
+    p,
+    await sharp(p).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer(),
+  );
+}
+async function shotRound(p, file, opts = {}) {
+  await shot(p, file, opts);
+  await round(file);
+}
 async function main(theme = "dark") {
   const p = await page();
   await p.goto(origin + "/app/dist/index.html?video");
   await p.waitForSelector(".row");
-  await p.evaluate((t) => {
-    window.setTheme(t);
-    window.__video.step();
-  }, theme);
+  await p.evaluate((t) => window.setTheme(t), theme);
+  // The speed plot is a real 60s time window; warm the mock so the curve has history.
+  for (let i = 0; i < 60; i++) {
+    await p.evaluate(() => window.__video.step());
+    await p.waitForTimeout(500);
+  }
   return p;
 }
 try {
   for (const theme of ["dark", "light"]) {
     const p = await main(theme);
-    await shot(p, `docs/assets/zh-cn/main-${theme}.png`);
+    await shotRound(p, `docs/assets/zh-cn/main-${theme}.png`);
     for (const f of [
       `docs/assets/app-${theme}.png`,
       `site/assets/app-${theme}.png`,
@@ -53,7 +70,7 @@ try {
     }
     await p.close();
   }
-  const p = await main("light");
+  const p = await main("dark");
   await p.locator("#btn-add").click();
   await p.locator("#add-batch").click();
   await p
@@ -61,11 +78,11 @@ try {
     .fill(
       "今日份下载清单：\nhttps://downloads.example.com/技术手册-网络协议.pdf\nhttps://downloads.example.com/海岸日记-4K.mp4\n同一个地址会自动去重：https://downloads.example.com/技术手册-网络协议.pdf",
     );
-  await shot(p, "docs/assets/zh-cn/batch-import.png");
+  await shotRound(p, "docs/assets/zh-cn/batch-import.png");
   await p.keyboard.press("Escape");
   await p.locator("#btn-search").click();
   await p.locator("#pal-q").fill("海岸");
-  await shot(p, "docs/assets/zh-cn/command-palette.png");
+  await shotRound(p, "docs/assets/zh-cn/command-palette.png");
   fs.copyFileSync(
     path.join(dir, "command-palette.png"),
     path.join(root, "docs/assets/palette.png"),
@@ -74,13 +91,12 @@ try {
   await p.keyboard.press("Escape");
   await p.locator("#btn-select").click();
   await p.locator("#bulk-all").check();
-  await shot(p, "docs/assets/zh-cn/batch-manage.png");
+  await shotRound(p, "docs/assets/zh-cn/batch-manage.png");
   await p.locator("#bulk-exit").click();
   for (const tab of ["general", "appearance", "downloads", "network", "automation", "browser", "about"]) {
     await p.locator("#btn-settings").click();
     await p.locator(`[data-tab="${tab}"]`).click();
-    await p.evaluate(() => window.setTheme("light"));
-    await shot(p, `docs/assets/zh-cn/settings-${tab}.png`);
+    await shotRound(p, `docs/assets/zh-cn/settings-${tab}.png`);
     if (["appearance", "network", "automation"].includes(tab)) {
       const dest = `site/assets/gallery/settings-${tab}.png`;
       fs.copyFileSync(path.join(root, `docs/assets/zh-cn/settings-${tab}.png`), path.join(root, dest));
@@ -91,14 +107,13 @@ try {
   await p.locator("#btn-settings").click();
   await p.locator('[data-tab="about"]').click();
   await p.locator("#check-update").click();
-  await shot(p, "docs/assets/zh-cn/check-update.png");
+  await shotRound(p, "docs/assets/zh-cn/check-update.png");
   await p.locator("#settings-close").click();
   await p.close();
-  const download = {};
   for (const [name, query, theme] of [
-    ["download-new", "confirm=1", "light"],
-    ["download-video", "confirm=1&yt", "light"],
-    ["download-progress", "id=1", "light"],
+    ["download-new", "confirm=1", "dark"],
+    ["download-video", "confirm=1&yt", "dark"],
+    ["download-progress", "id=1", "dark"],
     ["window-new", "confirm=1", "dark"],
     ["window-progress", "id=1", "dark"],
     ["window-progress-light", "id=1", "light"],
@@ -114,17 +129,17 @@ try {
     if (name === "window-progress")
       await q.locator('[data-a="details"]').click();
     await settle(q);
-    const height = await q
-      .locator("#root")
-      .evaluate((e) => Math.ceil(e.getBoundingClientRect().bottom + 16));
+    const height = await q.evaluate(() => {
+      const bar = document.querySelector(".w-bar").getBoundingClientRect().height;
+      return Math.ceil(bar + document.getElementById("view").scrollHeight);
+    });
     const file = name.startsWith("download-")
       ? `docs/assets/zh-cn/${name}.png`
       : `docs/assets/${name}.png`;
-    await shot(q, file, {
+    await shotRound(q, file, {
       clip: { x: 0, y: 0, width: 584, height: Math.min(height, 780) },
       omitBackground: true,
     });
-    download[name] = file;
     await q.close();
   }
   for (const theme of ["light", "dark"]) {
@@ -142,7 +157,7 @@ try {
     const height = await e.evaluate(() =>
       Math.ceil(document.body.getBoundingClientRect().height),
     );
-    await shot(e, `docs/assets/zh-cn/extension-${theme}.png`, {
+    await shotRound(e, `docs/assets/zh-cn/extension-${theme}.png`, {
       clip: { x: 0, y: 0, width: 320, height },
     });
     await e.close();
@@ -153,7 +168,7 @@ try {
   await web.route("**/demo-page", (r) =>
     r.fulfill({
       contentType: "text/html",
-      body: `<style>body{margin:0;background:#ececeb;color:#232429;font:15px 'Segoe UI',sans-serif}header{height:64px;padding:22px 42px;border-bottom:1px solid #ddd}main{width:840px;margin:28px auto}h1{font-size:24px;font-weight:500}video{display:block;width:840px;height:440px;background:#232429;border-radius:12px}p{font-size:12px;color:#777}</style><header>本地视频页面 · 演示场景</header><main><h1>奶龙写真 / 4K 高清重制</h1><video poster="/docs/assets/brand/social-preview.png"></video><p>示例页面及资源信息为模拟数据，不代表真实站点或真实下载测速。</p></main><script>Object.defineProperty(document.querySelector('video'),'currentSrc',{value:'https://example.com/nailong-demo.mp4'});</script>`,
+      body: `<style>body{margin:0;background:#ececeb;color:#232429;font:15px 'Segoe UI',sans-serif}header{height:64px;padding:22px 42px;border-bottom:1px solid #ddd}main{width:840px;margin:28px auto}h1{font-size:24px;font-weight:500}video{display:block;width:840px;height:440px;background:#232429;border-radius:12px}p{font-size:12px;color:#777}</style><header>本地视频页面 · 演示场景</header><main><h1>奶龙写真 / 4K 高清重制</h1><video poster="/docs/assets/app-dark.png"></video><p>示例页面及资源信息为模拟数据，不代表真实站点或真实下载测速。</p></main><script>Object.defineProperty(document.querySelector('video'),'currentSrc',{value:'https://example.com/nailong-demo.mp4'});</script>`,
     }),
   );
   await web.goto(origin + "/demo-page");
@@ -176,30 +191,6 @@ try {
       "让页面留给内容。",
       "图片浮层默认关闭，视频入口按需显示。",
       "docs/assets/zh-cn/browser-quiet.png",
-    ],
-    [
-      "docs/store/firefox/1-download-window.png",
-      "下载前，先确认。",
-      "文件名称、大小与保存位置，都由你决定。",
-      download["download-new"],
-    ],
-    [
-      "docs/store/firefox/2-faster.png",
-      "多连接，也能随时暂停。",
-      "查看实际进度与连接状态；速度数字仅为演示。",
-      download["window-progress"],
-    ],
-    [
-      "docs/store/firefox/3-youtube.png",
-      "选择适合你的清晰度。",
-      "可解析的视频与流媒体，通过统一窗口选择格式。",
-      download["download-video"],
-    ],
-    [
-      "docs/store/firefox/4-app.png",
-      "一个列表，整理所有下载。",
-      "分类、多选与批量操作。",
-      "docs/assets/zh-cn/main-light.png",
     ],
   ];
   for (const [file, title, sub, image] of studios) {
@@ -244,7 +235,6 @@ try {
     "docs/assets/zh-cn/main-light.png",
     "docs/assets/zh-cn/settings-browser.png",
     "docs/assets/zh-cn/settings-general.png",
-    ...studios.slice(1).map((s) => s[0]),
   ];
   for (const f of legacy)
     if (!report.includes(f)) throw Error("Legacy demo was not retaken: " + f);
@@ -280,6 +270,7 @@ try {
       top: Math.floor(i / 4) * 240 + 218,
     });
   }
+  fs.mkdirSync(path.join(root, "tools/ui/.artifacts"), { recursive: true });
   await sharp({
     create: {
       width: 1400,
@@ -290,9 +281,9 @@ try {
   })
     .composite(layers)
     .png()
-    .toFile(path.join(root, "docs/assets/brand/demo-contact-sheet.png"));
+    .toFile(path.join(root, "tools/ui/.artifacts/demo-contact-sheet.png"));
   console.log(
-    `Retaken ${report.length} captures, including all 21 legacy demo images. No page errors.`,
+    `Retaken ${report.length} captures, including all ${legacy.length} legacy demo images. No page errors.`,
   );
 } finally {
   await browser.close();

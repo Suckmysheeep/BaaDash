@@ -102,6 +102,7 @@ const STATUS: Record<Status, string> = {
 
 // ---------- state ----------
 const HISTORY = 120;
+const sampleTimes: number[] = [];
 const LIMITS = [0, 256, 1024, 5120, 10240];
 interface State {
   version: string;
@@ -236,12 +237,13 @@ function areaChart(
     }
     ctx.setLineDash([]);
   }
-  const n = HISTORY,
-    span = Math.max(Math.min(data.length, n), 30) - 1;
+  const n = HISTORY;
+  const stamps = sampleTimes.slice(-Math.min(data.length, n));
+  const latest = sampleTimes.at(-1) ?? performance.now();
   const pts = data
     .slice(-n)
-    .map((v, i, a): [number, number] => [
-      pw - (a.length - 1 - i) * (pw / span),
+    .map((v, i): [number, number] => [
+      pw - Math.max(0, latest - (stamps[i] ?? latest)) * pw / 60_000,
       yOf(v),
     ]);
   if (pts.length < 2) return;
@@ -312,6 +314,11 @@ function renderNav() {
 
   const active = state.items.filter((i) => i.status === "downloading");
   const queued = state.items.filter((i) => i.status === "queued").length;
+  // Telemetry is only meaningful while something is transferring (or about
+  // to); idle windows give the whole height to the task table.
+  const busy = active.length > 0 || queued > 0;
+  const telemetry = document.querySelector<HTMLElement>(".telemetry");
+  if (telemetry) telemetry.hidden = !busy;
   const total = active.reduce((s, i) => s + (i.speed || 0), 0);
   const [v, u] = total > 0 ? parts(total) : ["0", "B"];
   $("net-speed").textContent = v;
@@ -328,10 +335,12 @@ function renderNav() {
   const lim = state.settings?.speedLimitKib || 0;
   $("limit-btn").textContent = lim ? `≤ ${bytes(lim * 1024)}/s` : "不限速";
   $("limit-btn").classList.toggle("on", !!lim);
-  areaChart($("net-graph"), state.totalHist, {grid:true});
-  $("net-peak").textContent = speed(Math.max(0, ...state.totalHist));
+  if (busy) {
+    areaChart($("net-graph"), state.totalHist, {grid:true});
+    $("net-peak").textContent = speed(Math.max(0, ...state.totalHist));
+    renderMatrix(state.items, state.selected);
+  }
   $("workspace-count").textContent = `${state.items.length} 个任务`;
-  renderMatrix(state.items, state.selected);
 }
 
 // ---------- header ----------
@@ -596,7 +605,7 @@ async function openExtensionGuide(browserId?: string) {
   const dir = await invoke("extension_dir").catch(() => null);
   const ff = browserId === "firefox";
   const path =
-    (dir || "%LOCALAPPDATA%\\SwiftDL\\extension") + (ff ? "-firefox" : "");
+    (dir || "%LOCALAPPDATA%\\BaaDash\\extension") + (ff ? "-firefox" : "");
   $("ext-path").textContent = path;
   $("ext-path").title = path;
   const b = installedBrowsers().find((x) => x.id === browserId);
@@ -792,7 +801,7 @@ function act(name: string, it: Item | null | undefined, anchor?: HTMLElement) {
     case "resume":
       return resume([it.id]);
     case "browser":
-      return void invoke("open_url", {url: it.url.split("#")[0] + "#swiftdl-browser"});
+      return void invoke("open_url", {url: it.url.split("#")[0] + "#baadash-browser"});
     case "copy":
       return void copy(it.url, "链接已复制");
     case "copy-path":
@@ -873,7 +882,7 @@ function itemMenu(it: Item, x: number, y: number, above = false) {
     [
       { icon: "play", label: "下一个下载", enabled: it.status === "queued", run: () => void call("download_next", {id: it.id}) },
       { icon: "link", label: "从剪贴板替换失效链接", enabled: ["paused", "error"].includes(it.status) && !it.format && !it.torrentFiles, run: () => void replaceLink(it) },
-      { icon: "link", label: "用浏览器下载", enabled: it.status === "error", run: () => void invoke("open_url", {url: it.url.split("#")[0] + "#swiftdl-browser"}) },
+      { icon: "link", label: "用浏览器下载", enabled: it.status === "error", run: () => void invoke("open_url", {url: it.url.split("#")[0] + "#baadash-browser"}) },
       {
         icon: "open",
         label: "打开",
@@ -1043,6 +1052,24 @@ $("w-max").onclick = async () => {await appWindow?.toggleMaximize();await syncFr
 if(appWindow){void syncFrame();void appWindow.onResized(()=>{void syncFrame();});}
 $("w-close").onclick = () => appWindow?.close();
 if (!appWindow) $("win-ctrls").hidden = true;
+// Edge/corner strips resize the frameless window; "false" keeps Tauri's
+// drag-region handler from also starting a move drag on the same mousedown.
+if (appWindow) {
+  const host = document.querySelector(".app")!;
+  for (const [cls, dir] of [["n","North"],["s","South"],["e","East"],["w","West"],["ne","NorthEast"],["nw","NorthWest"],["se","SouthEast"],["sw","SouthWest"]]) {
+    const el = document.createElement("div");
+    el.className = `rz rz-${cls}`;
+    el.dataset.dir = dir;
+    el.setAttribute("data-tauri-drag-region", "false");
+    host.append(el);
+  }
+  document.addEventListener("mousedown", (e) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>(".rz");
+    if (!el || e.button !== 0) return;
+    e.preventDefault();
+    void appWindow.startResizeDragging?.(el.dataset.dir!);
+  });
+}
 
 async function setLimit(k: number) {
   await saveSettings({ ...settings(), speedLimitKib: k });
@@ -1905,12 +1932,20 @@ $("form-settings").addEventListener("submit",e=>{e.preventDefault();void submitS
 
 // ---------- data ----------
 function ingest(items: Item[]) { state.items=items; render(); }
-function sampleSpeeds(){let total=0;for(const it of state.items){const h=state.speedHist.get(it.id)||[];const value=it.status==='downloading'?(it.speed||0):0;h.push(value);if(h.length>HISTORY)h.shift();state.speedHist.set(it.id,h);total+=value;}for(const id of state.speedHist.keys())if(!byId(id))state.speedHist.delete(id);state.totalHist.push(total);if(state.totalHist.length>HISTORY)state.totalHist.shift();if(!document.hidden){renderNav();if(state.selected!==null)renderInspector();}}
+function sampleSpeeds(){
+ const now=performance.now();let total=0;
+ for(const it of state.items){const h=state.speedHist.get(it.id)||[];const value=it.status==='downloading'?(it.speed||0):0;h.push(value);state.speedHist.set(it.id,h);total+=value;}
+ for(const id of state.speedHist.keys())if(!byId(id))state.speedHist.delete(id);
+ sampleTimes.push(now);state.totalHist.push(total);
+ while(sampleTimes.length>HISTORY || (sampleTimes[0]??now)<now-60_000){sampleTimes.shift();state.totalHist.shift();}
+ for(const h of state.speedHist.values())if(h.length>sampleTimes.length)h.splice(0,h.length-sampleTimes.length);
+ if(!document.hidden){renderNav();if(state.selected!==null)renderInspector();}
+}
 
 // Updates: check a few seconds after start, then twice a day. A dismissed
 // version stays quiet; the next one shows again.
 let update: UpdateInfo | null = null;
-const SKIP_KEY = "swiftdl.skipUpdate";
+const SKIP_KEY = "baadash.skipUpdate";
 function renderUpdate(busy = false) {
   const card = $("update");
   let skipped = "";

@@ -23,11 +23,16 @@ const whenFull = (ms: number | null) => {
 const view = $("view");
 
 // The window grows and shrinks to fit what it shows.
+let fitted = 0;
 const fit = () => {
-  if (!win || !LogicalSize) return;
-  // Content height includes overflow, while native geometry owns the frame.
-  const h = Math.ceil(view.scrollHeight + $("w-title").parentElement!.getBoundingClientRect().height);
-  win.setSize(new LogicalSize(552, Math.min(780, h)));
+  if (!win || !LogicalSize || !view.childElementCount) return;
+  const bar = $("w-title").parentElement!.getBoundingClientRect().height;
+  const h = Math.max(240, Math.min(780, Math.ceil(view.scrollHeight + bar)));
+  // Scroll inside the window only once the content exceeds the height cap.
+  view.style.maxHeight = h >= 780 ? `${Math.floor(780 - bar)}px` : "";
+  if (h === fitted) return;
+  fitted = h;
+  win.setSize(new LogicalSize(552, h));
 };
 new ResizeObserver(fit).observe($("root"));
 const setTitle = (t: string) => { $("w-title").textContent = t; document.title = t; win?.setTitle(t); };

@@ -8,11 +8,11 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 static LOCK: Mutex<()> = Mutex::new(());
-/// Past this the log starts over, keeping the previous one as `swiftdl.old.log`.
+/// Past this the log starts over, keeping the previous one as `baadash.old.log`.
 const MAX: u64 = 1024 * 1024;
 
 pub fn path() -> PathBuf {
-    crate::browser::data_dir().join("swiftdl.log")
+    crate::browser::data_dir().join("baadash.log")
 }
 
 pub fn line(msg: &str) {
@@ -20,7 +20,7 @@ pub fn line(msg: &str) {
     let p = path();
     if let Some(dir) = p.parent() { let _ = std::fs::create_dir_all(dir); }
     if std::fs::metadata(&p).is_ok_and(|m| m.len() > MAX) {
-        let _ = std::fs::rename(&p, p.with_file_name("swiftdl.old.log"));
+        let _ = std::fs::rename(&p, p.with_file_name("baadash.old.log"));
     }
     let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let (h, m, s) = ((secs / 3600) % 24, (secs / 60) % 60, secs % 60);

@@ -95,6 +95,12 @@ pub fn open(app: &AppHandle, label: &str, query: &str, title: &str) -> tauri::Re
         return Ok(());
     }
     let (app, label, query, title) = (app.clone(), label.to_string(), query.to_string(), title.to_string());
+    // Match the saved theme so the window never flashes white before the
+    // webview paints; "system" keeps the same dark default as the main window.
+    let background = app
+        .try_state::<std::sync::Arc<crate::manager::DownloadManager>>()
+        .map(|m| if m.settings().theme == "light" { tauri::window::Color(244, 244, 244, 255) } else { tauri::window::Color(20, 20, 20, 255) })
+        .unwrap_or(tauri::window::Color(20, 20, 20, 255));
     std::thread::spawn(move || {
         // Opaque and frameless: native geometry clips the outer window.
         let built = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(format!("download.html?{query}").into()))
@@ -105,6 +111,7 @@ pub fn open(app: &AppHandle, label: &str, query: &str, title: &str) -> tauri::Re
             .decorations(false)
             .transparent(false)
             .shadow(false)
+            .background_color(background)
             .center()
             .focused(true)
             .always_on_top(true)

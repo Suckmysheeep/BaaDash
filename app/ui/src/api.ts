@@ -190,6 +190,7 @@ interface TauriWindow {
   setFocus(): Promise<void>;
   setTitle(t: string): Promise<void>;
   setSize(s: unknown): Promise<void>;
+  startResizeDragging?(direction: string): Promise<void>;
   isMaximized(): Promise<boolean>;
   onResized(cb: () => void): Promise<() => void>;
   onDragDropEvent?(

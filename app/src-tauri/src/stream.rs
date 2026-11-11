@@ -12,7 +12,7 @@ use futures_util::{StreamExt, stream};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
-use swiftdl_engine::{CancellationToken, Client, Outcome, Progress, header::HeaderMap};
+use baadash_engine::{CancellationToken, Client, Outcome, Progress, header::HeaderMap};
 use url::Url;
 
 /// Pieces fetched at once.
@@ -609,16 +609,16 @@ mod tests {
 #[cfg(test)]
 mod live {
     /// Downloads a real public stream: `cargo test live_hls -- --ignored --nocapture`
-    /// with SWIFTDL_HLS_URL and SWIFTDL_HLS_OUT set.
+    /// with BAADASH_HLS_URL and BAADASH_HLS_OUT set.
     #[test]
     #[ignore]
     fn live_hls() {
-        let url = std::env::var("SWIFTDL_HLS_URL").unwrap();
-        let out = std::path::PathBuf::from(std::env::var("SWIFTDL_HLS_OUT").unwrap());
-        let client = swiftdl_engine::build_client().unwrap();
-        let progress = std::sync::Arc::new(swiftdl_engine::Progress::default());
+        let url = std::env::var("BAADASH_HLS_URL").unwrap();
+        let out = std::path::PathBuf::from(std::env::var("BAADASH_HLS_OUT").unwrap());
+        let client = baadash_engine::build_client().unwrap();
+        let progress = std::sync::Arc::new(baadash_engine::Progress::default());
         let start = std::time::Instant::now();
-        let job = super::Job { video: url, audio: std::env::var("SWIFTDL_HLS_AUDIO").ok(), dest: out.clone(), headers: Default::default() };
+        let job = super::Job { video: url, audio: std::env::var("BAADASH_HLS_AUDIO").ok(), dest: out.clone(), headers: Default::default() };
         let r = tauri::async_runtime::block_on(super::run(&client, job, progress, Default::default(), Default::default())).unwrap();
         println!("{r:?} in {:.1}s, {} bytes", start.elapsed().as_secs_f64(), std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0));
     }

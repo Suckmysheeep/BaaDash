@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Merged into the macOS app's Info.plist by Tauri: SwiftDL opens magnet
+<!-- Merged into the macOS app's Info.plist by Tauri: BaaDash opens magnet
      links and .torrent files (see src/torrent.rs and the Opened event in main.rs). -->
 <plist version="1.0">
 <dict>

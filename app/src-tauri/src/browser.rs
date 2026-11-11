@@ -17,14 +17,15 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
-pub const HOST_NAME: &str = "com.swiftdl.host";
+pub const HOST_NAME: &str = "com.baadash.host";
+pub const APP_ID: &str = "com.baadash.app";
 
 /// Extension IDs allowed to talk to the app. Fixed by the `key` in
 /// `extension/manifest.json`; keep that key when publishing to the Chrome
 /// Web Store (upload `extension-key.pem` once) so the ID stays the same.
 pub const EXTENSION_IDS: &[&str] = &["knmfjbmojepkdiflnckpfjimfmjfcbgh"];
 /// The Firefox add-on's ID (browser_specific_settings in its manifest).
-pub const FIREFOX_ID: &str = "swiftdl@harshhh.me";
+pub const FIREFOX_ID: &str = "baadash@baadash.app";
 pub const STORE_UPDATE_URL: &str = "https://clients2.google.com/service/update2/crx";
 
 /// Flip to `true` once the extension is live on the Chrome Web Store. Until
@@ -32,8 +33,9 @@ pub const STORE_UPDATE_URL: &str = "https://clients2.google.com/service/update2/
 /// instead of offering store buttons that would lead nowhere.
 pub const STORE_PUBLISHED: bool = false;
 
-/// The add-on's listing on Firefox Add-ons (live since 0.3.0).
-pub const FIREFOX_STORE_URL: &str = "https://addons.mozilla.org/firefox/addon/swiftdl-integration/";
+/// Where the Firefox add-on is distributed: the release page carries the
+/// signed-per-install xpi built from this repository.
+pub const FIREFOX_STORE_URL: &str = "https://github.com/Suckmysheeep/BaaDash/releases/latest";
 
 pub fn store_url() -> String {
     format!("https://chromewebstore.google.com/detail/{}", EXTENSION_IDS[0])
@@ -42,7 +44,7 @@ pub fn store_url() -> String {
 /// Same folder Tauri uses for `app_data_dir`, computed without a running
 /// app so the native-host process can use it too.
 pub fn data_dir() -> PathBuf {
-    let id = "com.swiftdl.app";
+    let id = APP_ID;
     #[cfg(windows)]
     let base = std::env::var_os("APPDATA").map(PathBuf::from);
     #[cfg(target_os = "macos")]
@@ -206,6 +208,37 @@ fn register_firefox(data_dir: &Path, exe: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Drops native messaging registrations left under the pre-rename host name
+/// so browsers stop launching the old executable.
+pub fn unregister_legacy() {
+    const LEGACY_HOST: &str = "com.swiftdl.host";
+    #[cfg(windows)]
+    {
+        use winreg::enums::HKEY_CURRENT_USER;
+        use winreg::RegKey;
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        for b in BROWSERS {
+            let _ = hkcu.delete_subkey_all(format!(r"{}\NativeMessagingHosts\{LEGACY_HOST}", b.reg_root));
+        }
+        let _ = hkcu.delete_subkey_all(format!(r"Software\Mozilla\NativeMessagingHosts\{LEGACY_HOST}"));
+    }
+    #[cfg(not(windows))]
+    {
+        let mut bases: Vec<PathBuf> = BROWSERS.iter().map(|b| home().join(b.config_dir)).filter(|p| p.is_dir()).collect();
+        for p in chromium_profile_dirs(&home()) {
+            if !bases.contains(&p) { bases.push(p); }
+        }
+        for base in bases {
+            let _ = std::fs::remove_file(base.join("NativeMessagingHosts").join(format!("{LEGACY_HOST}.json")));
+        }
+        #[cfg(target_os = "macos")]
+        let dir = home().join("Library/Application Support/Mozilla/NativeMessagingHosts");
+        #[cfg(not(target_os = "macos"))]
+        let dir = home().join(".mozilla/native-messaging-hosts");
+        let _ = std::fs::remove_file(dir.join(format!("{LEGACY_HOST}.json")));
+    }
 }
 
 // ---------- browsers ----------
@@ -439,7 +472,7 @@ mod tests {
 
     #[test]
     fn finds_chromium_forks_by_shape() {
-        let home = std::env::temp_dir().join(format!("swiftdl-forks-{}", std::process::id()));
+        let home = std::env::temp_dir().join(format!("baadash-forks-{}", std::process::id()));
         #[cfg(target_os = "macos")]
         let root = home.join("Library/Application Support");
         #[cfg(not(target_os = "macos"))]

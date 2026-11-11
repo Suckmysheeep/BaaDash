@@ -1,8 +1,8 @@
 """Talk to the app the way the browser extension does, for testing the
 native messaging host without a browser.
 
-    python tools/send_native_message.py <path-to-swiftdl-app.exe> ping
-    python tools/send_native_message.py <path-to-swiftdl-app.exe> download <url> [referrer]
+    python tools/send_native_message.py <path-to-baadash-app.exe> ping
+    python tools/send_native_message.py <path-to-baadash-app.exe> download <url> [referrer]
 """
 
 import json

@@ -36,7 +36,7 @@ pub fn get_state(m: Mgr) -> AppState {
 
 #[tauri::command]
 pub async fn probe_url(m: Mgr<'_>, url: String, headers: Vec<(String, String)>) -> Result<ProbeInfo, String> {
-    let remote = swiftdl_engine::probe(m.client(), url.trim(), &to_header_map(&headers)).await.map_err(|e| format!("{e:#}"))?;
+    let remote = baadash_engine::probe(m.client(), url.trim(), &to_header_map(&headers)).await.map_err(|e| format!("{e:#}"))?;
     let category = category_for(&remote.filename).to_string();
     Ok(ProbeInfo {
         dir: m.default_dir(&category),
@@ -91,7 +91,7 @@ mod tests {
         assert!(check_add(&req("https://example.com/a.iso", false)).is_ok());
         assert!(check_add(&req("magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c", true)).is_ok());
         assert!(check_add(&req("https://example.com/a.torrent", true)).is_ok());
-        let file = std::env::temp_dir().join("swiftdl-test.torrent");
+        let file = std::env::temp_dir().join("baadash-test.torrent");
         std::fs::write(&file, b"d4:infod4:name1:aee").unwrap();
         assert!(check_add(&req(&file.to_string_lossy(), true)).is_ok(), "a .torrent file on disk");
         let _ = std::fs::remove_file(file);
@@ -134,7 +134,7 @@ pub fn open_file(m: Mgr, id: u64) -> Result<(), String> {
 #[tauri::command]
 pub fn open_folder(m: Mgr, id: u64) -> Result<(), String> {
     let item = m.item(id).ok_or("not found")?;
-    let target = if item.path.exists() { item.path.clone() } else { swiftdl_engine::part_path(&item.path) };
+    let target = if item.path.exists() { item.path.clone() } else { baadash_engine::part_path(&item.path) };
     if target.exists() {
         m.app_handle().opener().reveal_item_in_dir(target).map_err(|e| e.to_string())
     } else {
@@ -150,7 +150,7 @@ pub fn set_settings(m: Mgr, mut settings: Settings) -> Result<(), String> {
     }
     settings.accent_color.make_ascii_lowercase();
     if !["compact", "comfortable"].contains(&settings.interface_density.as_str()) { return Err("界面密度无效".into()); }
-    swiftdl_engine::build_client_opts(&settings.proxy, &settings.bind_address).map_err(|e| format!("{e:#}"))?;
+    baadash_engine::build_client_opts(&settings.proxy, &settings.bind_address).map_err(|e| format!("{e:#}"))?;
     settings.interface_scale = settings.interface_scale.clamp(90, 150);
     if !["", "close", "sleep", "shutdown"].contains(&settings.when_finished.as_str()) { return Err("完成后动作无效".into()); }
     m.set_settings(settings);

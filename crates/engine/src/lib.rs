@@ -1,4 +1,4 @@
-//! swiftdl-engine: segmented, resumable, multi-connection HTTP downloads.
+//! baadash-engine: segmented, resumable, multi-connection HTTP downloads.
 //!
 //! Front ends (the CLI and the desktop app) build a [`Request`], hand it to
 //! [`run`] together with a [`Progress`] they can poll, a cancellation token

@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use swiftdl_engine::header::{HeaderMap, HeaderName, HeaderValue};
-use swiftdl_engine::{CancellationToken, Client, Outcome, Progress, Request, SpeedLimiter};
+use baadash_engine::header::{HeaderMap, HeaderName, HeaderValue};
+use baadash_engine::{CancellationToken, Client, Outcome, Progress, Request, SpeedLimiter};
 use tauri::{AppHandle, Emitter};
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Debug)]
@@ -232,7 +232,7 @@ impl DownloadManager {
                 item.status = Status::Paused;
             }
             if item.status != Status::Completed && item.remaining.is_empty() {
-                item.remaining = swiftdl_engine::saved_remaining(&item.path).unwrap_or_default();
+                item.remaining = baadash_engine::saved_remaining(&item.path).unwrap_or_default();
             }
         }
         crate::media::set_proxy(&settings.proxy);
@@ -240,7 +240,7 @@ impl DownloadManager {
         let next_id = items.iter().map(|i| i.id).max().unwrap_or(0) + 1;
         Ok(Arc::new(Self {
             app,
-            client: swiftdl_engine::build_client_opts(&settings.proxy, &settings.bind_address)?,
+            client: baadash_engine::build_client_opts(&settings.proxy, &settings.bind_address)?,
             limiter: Arc::new(SpeedLimiter::new(settings.speed_limit_kib * 1024)),
             ignore_limit: AtomicBool::new(false),
             data_dir,
@@ -295,7 +295,7 @@ impl DownloadManager {
 
     pub fn add(self: &Arc<Self>, req: AddRequest) -> u64 {
         let filename = clean_filename(&req.filename);
-        let path = swiftdl_engine::resolve_dest(&req.dir, &filename);
+        let path = baadash_engine::resolve_dest(&req.dir, &filename);
         let id = {
             let mut g = self.inner.lock().unwrap();
             let id = g.next_id;
@@ -358,13 +358,13 @@ impl DownloadManager {
             if !matches!(item.status, Status::Paused | Status::Error) || item.format.is_some() || item.torrent_files.is_some() { return Err("仅支持暂停或失败的普通文件任务".into()); }
             // Rebase only the address. Existing validators and range checks stay mandatory.
             let mut state_name = item.path.as_os_str().to_os_string();
-            state_name.push(".swiftdl");
+            state_name.push(".baadash");
             let state_path = PathBuf::from(state_name);
             if state_path.exists() {
                 let raw = std::fs::read(&state_path).map_err(|e| e.to_string())?;
                 let mut saved: serde_json::Value = serde_json::from_slice(&raw).map_err(|e| e.to_string())?;
                 saved["url"] = serde_json::Value::String(parsed.to_string());
-                let tmp = state_path.with_extension("swiftdl.tmp");
+                let tmp = state_path.with_extension("baadash.tmp");
                 std::fs::write(&tmp, serde_json::to_vec(&saved).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
                 std::fs::rename(tmp, state_path).map_err(|e| e.to_string())?;
             }
@@ -484,7 +484,7 @@ impl DownloadManager {
         let this = self.clone();
         tauri::async_runtime::spawn(async move {
             let headers = inc.headers();
-            let probed = swiftdl_engine::probe(&this.client, &inc.url, &to_header_map(&headers)).await.ok().map(|r| r.filename);
+            let probed = baadash_engine::probe(&this.client, &inc.url, &to_header_map(&headers)).await.ok().map(|r| r.filename);
             let filename = inc.suggested_name().or(probed).unwrap_or_else(|| "download.bin".into());
             let dir = this.default_dir(category_for(&filename));
             this.add(AddRequest { checksum: None, url: inc.url, filename, dir, headers, start: true, window: None, format: None, size: None, torrent_files: None, background: false, convert_gif: false, gif_options: None });
@@ -518,7 +518,7 @@ impl DownloadManager {
                     let name = match inc.suggested_name() {
                         Some(name) => Some(name),
                         None if media => Some("video.mp4".into()),
-                        None => swiftdl_engine::probe(&client, &inc.url, &to_header_map(&headers)).await.ok().map(|r| r.filename),
+                        None => baadash_engine::probe(&client, &inc.url, &to_header_map(&headers)).await.ok().map(|r| r.filename),
                     };
                     (inc, headers, name, media)
                 });
@@ -682,7 +682,7 @@ impl DownloadManager {
                         let job = crate::torrent::Job { url: req.url.clone(), headers: req.headers.clone(), dir, files, seed };
                         crate::torrent::run(&this.client, job, progress, note.clone(), cancel).await
                     }
-                    Kind::File => swiftdl_engine::run(&this.client, &req, progress, cancel, this.limiter.clone()).await,
+                    Kind::File => baadash_engine::run(&this.client, &req, progress, cancel, this.limiter.clone()).await,
                 };
                 let result = this.verify(id, result, &note).await;
                 let mut gif_path = None;
@@ -976,9 +976,9 @@ pub fn category_for(filename: &str) -> &'static str {
 
 fn remove_temp_files(path: &Path) {
     crate::media::cleanup(path);
-    let _ = std::fs::remove_file(swiftdl_engine::part_path(path));
+    let _ = std::fs::remove_file(baadash_engine::part_path(path));
     let mut state = path.as_os_str().to_owned();
-    state.push(".swiftdl");
+    state.push(".baadash");
     let _ = std::fs::remove_file(PathBuf::from(state));
 }
 

@@ -25,7 +25,7 @@ const SAVE_EVERY: Duration = Duration::from_secs(1);
 
 pub struct Request {
     pub url: String,
-    /// Final file path. `<dest>.part` and `<dest>.swiftdl` live beside it
+    /// Final file path. `<dest>.part` and `<dest>.baadash` live beside it
     /// until the download completes.
     pub dest: PathBuf,
     pub connections: usize,
@@ -149,7 +149,7 @@ pub fn build_client_opts(proxy: &str, bind: &str) -> Result<Client> {
         // one congestion window, which defeats the point. Force HTTP/1.1 so
         // each segment gets its own TCP connection.
         .http1_only()
-        .user_agent(concat!("swiftdl/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("baadash/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(15))
         .read_timeout(Duration::from_secs(30))
         .build()?)
@@ -174,7 +174,7 @@ pub async fn run(
     progress.resumable.store(remote.resumable, Ordering::Relaxed);
 
     let part = part_path(&req.dest);
-    let state_path = append_ext(&req.dest, "swiftdl");
+    let state_path = append_ext(&req.dest, "baadash");
     let outcome = match (remote.resumable, remote.size) {
         (true, Some(size)) => {
             download_segmented(client.clone(), req, &remote, size, &part, &state_path, progress, cancel, limiter)
@@ -186,6 +186,7 @@ pub async fn run(
         if req.dest.exists() { bail!("目标文件已经存在，为避免覆盖已停止完成操作：{}",req.dest.display()); }
         std::fs::rename(&part, &req.dest).with_context(|| format!("could not rename to {}", req.dest.display()))?;
         let _ = std::fs::remove_file(&state_path);
+        let _ = std::fs::remove_file(legacy_state_path(&req.dest));
     }
     Ok(outcome)
 }
@@ -203,7 +204,7 @@ async fn download_segmented(
     limiter: Arc<SpeedLimiter>,
 ) -> Result<Outcome> {
     let saved = (!req.restart && part.exists())
-        .then(|| SavedState::load(state_path))
+        .then(|| SavedState::load(state_path).or_else(|| SavedState::load(&legacy_state_path(&req.dest))))
         .flatten()
         .filter(|s| s.matches(&req.url, size, &remote.etag, &remote.last_modified))
         .filter(|_| std::fs::metadata(part).map(|m| m.len() == size).unwrap_or(false));
@@ -434,7 +435,14 @@ pub fn part_path(dest: &Path) -> PathBuf {
 
 /// The still-missing ranges of a paused download, from its resume file.
 pub fn saved_remaining(dest: &Path) -> Option<Vec<(u64, u64)>> {
-    SavedState::load(&append_ext(dest, "swiftdl")).map(|s| s.segments)
+    SavedState::load(&append_ext(dest, "baadash"))
+        .or_else(|| SavedState::load(&legacy_state_path(dest)))
+        .map(|s| s.segments)
+}
+
+/// Resume files written before the BaaDash rename kept the old extension.
+fn legacy_state_path(dest: &Path) -> PathBuf {
+    append_ext(dest, "swiftdl")
 }
 
 fn append_ext(path: &Path, ext: &str) -> PathBuf {
