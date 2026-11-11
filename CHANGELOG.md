@@ -8,6 +8,18 @@ BaaDash 的重要变更记录于此。格式参考 [Keep a Changelog](https://ke
 
 暂无。
 
+## [0.4.0] - 2026-11-11
+
+### 界面重构
+
+- 采用石墨黑与中性灰阶、品牌荧光绿，保留羊头图标，应用名称使用字体排版。
+- 重做紧凑任务工作区与专业数据表，直接展示大小、进度、速度、剩余时间和连接数，完整保留七类文件分类。
+- 主界面恢复真实网速曲线与多连接点阵；点阵按各连接的实际分段范围绘制，不填充虚构数据。
+- 设置改为应用内页面，左上角返回列表；未保存更改可保存离开、放弃或继续编辑。
+- 使用太阳／月亮切换主题，新增紧凑／标准密度和减少动态效果设置；旧用户自选强调色继续保留。
+- 窗口圆角由原生窗口管理：Windows 10/11 使用实际窗口区域裁切；独立窗口移除透明阴影边距。
+- 保留下载核心、图片/Pixiv/GIF 独立记录、媒体与种子下载、浏览器集成、续传和校验能力。
+
 ## [0.3.1] - 2026-11-11
 
 ### 界面与外观
@@ -110,7 +122,8 @@ BaaDash 的首个正式版本，以新的项目身份发布，承接此前中文
 - 分享文本功能只提取普通链接，不增加站点专用解析，不绕过登录、会员、DRM 或网站访问限制。
 - 多连接不能突破实际带宽，速度取决于服务器、网络与磁盘；续传取决于服务器是否支持及文件是否变更。
 
-[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.4.0
 [0.3.1]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.2.0

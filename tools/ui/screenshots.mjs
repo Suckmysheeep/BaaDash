@@ -59,12 +59,12 @@ try {
   await p
     .locator("#batch-text")
     .fill(
-      "今日份下载清单：\nhttps://downloads.example.com/大学生期末速成-看完不挂科.pdf\nhttps://downloads.example.com/奶龙写真-4K-UNCENSORED.mp4\n同一个地址会自动去重：https://downloads.example.com/大学生期末速成-看完不挂科.pdf",
+      "今日份下载清单：\nhttps://downloads.example.com/技术手册-网络协议.pdf\nhttps://downloads.example.com/海岸日记-4K.mp4\n同一个地址会自动去重：https://downloads.example.com/技术手册-网络协议.pdf",
     );
   await shot(p, "docs/assets/zh-cn/batch-import.png");
   await p.keyboard.press("Escape");
-  await p.locator("#btn-palette").click();
-  await p.locator("#pal-q").fill("奶龙");
+  await p.locator("#btn-search").click();
+  await p.locator("#pal-q").fill("海岸");
   await shot(p, "docs/assets/zh-cn/command-palette.png");
   fs.copyFileSync(
     path.join(dir, "command-palette.png"),

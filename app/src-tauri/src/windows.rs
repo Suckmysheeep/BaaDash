@@ -9,7 +9,6 @@ pub fn polish(window: &WebviewWindow) {
     if let Ok(hwnd) = window.hwnd() {
         // The real region owns the contour on both Windows 10 and 11.
         // Avoid a rectangular compositor shadow around the clipped region.
-        let _ = window.set_shadow(false);
         unsafe { native_shape(hwnd.0, window.is_maximized().unwrap_or(false)); }
     }
     #[cfg(not(windows))]
@@ -33,6 +32,20 @@ unsafe fn native_shape(hwnd: *mut std::ffi::c_void, maximized: bool) {
     unsafe extern "system" {
         fn CreateRoundRectRgn(left:i32, top:i32, right:i32, bottom:i32, width:i32, height:i32) -> *mut c_void;
         fn DeleteObject(object: *mut c_void) -> i32;
+    }
+    // Deduplicate region updates: SetWindowRgn itself emits position messages.
+    // Keep the bounded cache free of HWND ownership; Windows owns all regions.
+    type Shape = (i32, i32, u32, bool);
+    static SHAPES: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<usize, Shape>>> = std::sync::OnceLock::new();
+    let mut bounds = Rect { left:0, top:0, right:0, bottom:0 };
+    if unsafe { GetWindowRect(hwnd, &mut bounds) } == 0 { return; }
+    let dpi = unsafe { GetDpiForWindow(hwnd) }.max(96);
+    let shape = (bounds.right-bounds.left, bounds.bottom-bounds.top, dpi, maximized);
+    {
+        let mut shapes = SHAPES.get_or_init(Default::default).lock().unwrap_or_else(|e|e.into_inner());
+        if shapes.get(&(hwnd as usize)) == Some(&shape) { return; }
+        if shapes.len() >= 128 { shapes.clear(); }
+        shapes.insert(hwnd as usize, shape);
     }
     let preference: u32 = 1; // DWM does not add a second, competing contour.
     let border: u32 = 0xffff_fffe;

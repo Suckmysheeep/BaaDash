@@ -296,3 +296,6 @@ footer p {
     padding-top: 40px;
   }
 }
+/* BaaDash brand: graphite surfaces, fluorescent accent, typeset name. */
+body{background:#141414;color:#efefef}header .brand{display:flex;align-items:center;gap:10px;text-decoration:none}header .brand img{width:32px;height:32px}.brand-name{font-size:23px;font-weight:600;letter-spacing:-.7px}.hero-brand{display:flex;justify-content:center;align-items:center;gap:19px;margin:0 auto 28px}.hero-brand img{width:84px;height:84px}.hero-brand span{font-size:65px;font-weight:600;letter-spacing:-2.5px}.footer-brand{font-size:22px;font-weight:600;letter-spacing:-.6px}.button.primary{background:#e3fa61;color:#171714;border-color:transparent}.button.primary:hover{background:#d9ec4f}nav a:hover{color:#e3fa61}.eyebrow{color:#e3fa61}
+@media(max-width:700px){.hero-brand img{width:58px;height:58px}.hero-brand span{font-size:46px}.hero-brand{gap:12px}.brand-name{font-size:20px}header .brand img{width:28px;height:28px}}
