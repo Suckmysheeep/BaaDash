@@ -142,11 +142,11 @@ declare global {
   }
 
   const items = [
-    item("奶龙写真-4K-UNCENSORED.mp4", 2.8 * GB, "downloading", 3, {
+    item("海岸日记-4K.mp4", 2.8 * GB, "downloading", 3, {
       frac: 0.58,
     }),
     item("鸡你太美-高清重制版.mp4", 812 * MB, "downloading", 5, { frac: 0.24 }),
-    item("摸鱼效率工具-绿色版.msi", 412 * MB, "queued", 6),
+    item("BaaDash-安装程序.msi", 412 * MB, "queued", 6),
     item("电子木鱼-赛博功德-无损音质.flac", 286 * MB, "paused", 75, {
       frac: 0.34,
     }),
@@ -263,7 +263,7 @@ declare global {
       items: clone(),
       settings: { ...settings },
       pending: [],
-      version: "0.2.0",
+      version: "0.3.0",
     }),
     probe_url: async ({ url }) => {
       if (!VIDEO) await new Promise((r) => setTimeout(r, 700));
@@ -434,14 +434,14 @@ declare global {
           }
         : VIDEO && !location.search.includes("yt")
           ? {
-              url: "https://cdn.example.net/files/奶龙写真-4K-UNCENSORED.mp4",
+              url: "https://cdn.example.net/files/海岸日记-4K.mp4",
               filename: "",
               referrer: "https://example.net/share",
             }
           : location.search.includes("yt")
             ? { url: "https://media.example.net/watch/nailong", filename: "" }
             : {
-                url: "https://cdn.example.net/files/摸鱼效率工具-绿色版.msi",
+                url: "https://cdn.example.net/files/BaaDash-安装程序.msi",
                 filename: "",
                 referrer: "https://example.net/share",
               },
@@ -449,7 +449,7 @@ declare global {
     probe_note: () => null,
     show_main: () => {},
     check_update: () => ({
-      version: "0.2.0",
+      version: "0.3.0",
       page: "https://github.com/Suckmysheeep/BaaDash/releases/latest",
       asset: null,
     }),

@@ -5,7 +5,10 @@ import ts from "../../app/node_modules/typescript/lib/typescript.js";
 import { start } from "./runtime.mjs";
 
 const util = fs.readFileSync(new URL("../../app/ui/src/util.ts", import.meta.url), "utf8");
-const js = ts.transpileModule(util, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+const iconSource = fs.readFileSync(new URL("../../app/ui/src/icons.ts", import.meta.url), "utf8");
+const iconJS = ts.transpileModule(iconSource, {compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const iconURL = 'data:text/javascript;base64,'+Buffer.from(iconJS).toString('base64');
+const js = ts.transpileModule(util, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText.replaceAll('"./icons"', JSON.stringify(iconURL));
 const { extractLinks } = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
 assert.deepEqual(extractLinks("分享：https://files.test/file[01-03].zip，https://files.test/file02.zip"), [
   "https://files.test/file01.zip", "https://files.test/file02.zip", "https://files.test/file03.zip",
@@ -28,16 +31,19 @@ try {
   await page.goto(origin+"/app/dist/index.html?video");
   await page.waitForSelector(".row");
   await page.locator("#btn-settings").click();
-  await page.locator('[data-tab="speed"]').click();
+  await page.locator('[data-tab="network"]').click();
+  await page.locator("#set-proxy-mode").selectOption("manual");
   await page.locator("#set-proxy").fill("socks5h://127.0.0.1:1080");
+  await page.locator("#network-advanced summary").click();
   await page.locator("#set-bind").fill("127.0.0.1");
+  await page.locator('[data-tab="appearance"]').click();
   await page.locator("#set-scale").fill("120");
   assert.equal(await page.evaluate(()=>document.documentElement.style.zoom),"1.2");
   await page.locator("#settings-close").click();
   await page.waitForFunction(()=>document.documentElement.style.zoom === "1");
   assert.equal(await page.evaluate(()=>document.documentElement.style.zoom),"1");
   await page.locator("#btn-settings").click();
-  await page.locator('[data-tab="speed"]').click();
+  await page.locator('[data-tab="network"]').click();
   assert.equal(await page.locator("#set-proxy").inputValue(),"");
   for(const width of [820,1120]) {
     await page.setViewportSize({width,height:760});

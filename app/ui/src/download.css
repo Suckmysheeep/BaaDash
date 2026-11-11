@@ -25,7 +25,7 @@ body.dlw { overflow: hidden; --win-edge: rgba(0, 0, 0, .1); }
 /* header */
 .d-head { display: flex; align-items: center; gap: 12px; }
 .glyph { width: 32px; height: 32px; display: grid; place-items: center; flex: none; color: var(--muted); }
-.glyph svg.ic { width: 28px; height: 28px; stroke-width: 1.3; }
+.glyph :is(svg,img).ic { width: 28px; height: 28px; stroke-width: 1.3; }
 .d-name { flex: 1; min-width: 0; }
 .d-name b, .d-name input { display: block; width: 100%; font: 600 14.5px/1.35 var(--font-display); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .d-name input { border: 0; outline: none; background: none; padding: 1px 6px; margin-left: -6px; border-radius: 5px; user-select: text; }
@@ -86,7 +86,11 @@ body.dlw { overflow: hidden; --win-edge: rgba(0, 0, 0, .1); }
 .dd:hover { background: var(--btn-hover); }
 .dd:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--accent); }
 .dd span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dd svg.ic { width: 12px; height: 12px; flex: none; color: var(--muted); transform: rotate(90deg); }
+.dd :is(svg,img).ic { width: 12px; height: 12px; flex: none; color: var(--muted); transform: rotate(90deg); }
 /* Solid: the small window has text right under it. */
 .dd-menu { min-width: 160px; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); backdrop-filter: none; }
 .dd-menu button.on { color: var(--text); background: var(--active); }
+
+#c-advanced-host { margin-top:16px; }
+#c-advanced-host .advanced-panel { margin-bottom:0; }
+#view { max-height:680px; overflow-y:auto; }

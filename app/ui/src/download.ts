@@ -1,3 +1,4 @@
+import { taskAdvanced, bindTaskAdvanced, readTaskChecksum } from "./advanced";
 // The per-download window, like IDM's:
 //   download.html?confirm=<token>  "New download": a file caught from the
 //                                  browser, waiting for Start / Later / Cancel
@@ -67,18 +68,19 @@ async function confirmView(token: number) {
   view.innerHTML = `
     <div class="d-head"><span id="c-tile">${glyph("Other")}</span><div class="d-name"><input id="c-name" spellcheck="false" placeholder="正在获取文件信息…"><div class="d-sub"><span class="st">${esc(host(inc.url))}</span></div></div></div>
     <div class="kv">
-      <span class="k">SHA-256（可选）</span><span class="v"><input id="c-checksum" maxlength="64" placeholder="下载后校验文件"></span>
       <span class="k">下载地址</span><span class="v"><span title="${esc(inc.url)}">${esc(inc.url)}</span></span>
       <span class="k">文件大小</span><span class="v" id="c-size"><span class="spinner"></span><span class="muted">正在检查…</span></span>
       <span class="k">文件分类</span><span class="v"><select id="c-cat">${Object.keys(CATS).map((c) => `<option value="${c}">${categoryLabel(c)}</option>`).join("")}</select></span>
       <span class="k">保存到</span><span class="v"><span class="path" id="c-dir" title=""></span><button class="btn sm" id="c-browse">更改</button></span>
     </div>
+    <div id="c-advanced-host" hidden>${taskAdvanced("c")}</div>
     <div class="d-foot">
       <button class="btn" id="c-later">稍后下载</button>
       <span class="grow"></span>
       <button class="btn" id="c-cancel">取消</button>
       <button class="btn primary" id="c-start" disabled>开始下载</button>
     </div>`;
+  bindTaskAdvanced("c");
   const setDir = (d: string) => { dir = d; $("c-dir").textContent = d; $("c-dir").title = d; };
   setDir(dir);
   $("c-start").focus();
@@ -92,6 +94,7 @@ async function confirmView(token: number) {
     setDir(info.dir);
     $("c-size").innerHTML = `<span>${info.size != null ? bytes(info.size) : "大小未知"}</span><span class="muted">${info.resumable ? `支持续传 · ${settings.connections} 个连接` : "不支持续传 · 单连接"}</span>`;
     $("c-start").disabled = false;
+    $("c-advanced-host").hidden = false;
   } catch (e) {
     $("c-name").value = inc.filename || "download";
     $("c-size").innerHTML = `<span class="err">无法获取文件：${esc(displayText(e))}</span>`;
@@ -103,7 +106,9 @@ async function confirmView(token: number) {
   const add = async (start: boolean) => {
     const filename = $("c-name").value.trim();
     if (!filename) return;
-    const id = await addDownload({ checksum: $("c-checksum").value.trim() || null, url: inc.url, filename, dir, headers, start, window: win?.label });
+    const checksum = readTaskChecksum("c");
+    if (checksum === undefined) return;
+    const id = await addDownload({ checksum, url: inc.url, filename, dir, headers, start, window: win?.label });
     if (id == null) return;
     invoke("forget_confirm", { token });
     if (!start) { $("w-close").click(); return; }
