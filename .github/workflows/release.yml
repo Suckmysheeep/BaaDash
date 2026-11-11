@@ -53,7 +53,9 @@ jobs:
         run: |
           # Web UI users may create the tag by publishing a placeholder release.
           # Reuse it when present, so both tag pushes and manual rebuilds work.
-          id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .id 2>/dev/null) || id=""
+          # The by-tag endpoint excludes drafts. List releases so a draft
+          # prepared by the maintainer keeps its author and is not duplicated.
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -r --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | first | .id // empty')
           if [ -n "$id" ]; then
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -f name="BaaDash $TAG" -F draft=true -F body=@notes.md > /dev/null
           else
