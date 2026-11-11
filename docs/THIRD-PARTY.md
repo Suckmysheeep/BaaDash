@@ -1,12 +1,15 @@
 # 第三方资源
 
-## Kubai Icons
+## Lucide
 
-- 用途：桌面应用的功能图标，静态 Soft SVG 的单色适配，按需复制，不依赖在线服务。
-- 版本：`kubai-icons-static@0.5.0`，来自 npm 的官方发布包。
-- 项目：https://github.com/kubai087/kubai-icons
-- 文件：`app/ui/public/icons/kubai/`；单色派生和别名映射：`app/ui/src/icons.ts`。
-- 许可：图标与四个使用包采用 MIT，完整声明保留在同目录 `LICENSE` 并随应用打包。
-- 未复制其网站、技能规则、Kubai/Lumno 名称或品牌标识；这些部分不属于图标的 MIT 授权范围。
+- 用途：桌面功能图标，`lucide-static@1.72.0`，仅打包映射使用的 SVG。
+- 项目：https://github.com/lucide-icons/lucide
+- 映射：`tools/ui/icon-map.json`；生成：`tools/ui/build-icons.mjs`。
+- ISC 及所含 Feather 图标许可全文：`app/ui/public/licenses/lucide-LICENSE`，随应用离线分发。
 
-新增或升级图标时，核对官方 `LICENSING.md`、图标许可和真实大小的深浅色效果。不要将整个上游仓库按 MIT 处理。
+## lucide-animated
+
+- 项目：https://github.com/pqoqubbw/icons ，官网 https://lucide-animated.com/ 。
+- 参考版本：`9d1260d2722b63b3846eb97c1141f44f744365ff`，`icons/settings.tsx`、`icons/download.tsx`。
+- `app/ui/src/icon-motion.ts` 将设置旋转、下载箭头移动适配为 Web Animations API，并限定触发入口、时长和减少动态效果行为；没有引入 React/Motion 运行时，曲线与原 Motion spring 不完全相同。
+- MIT 许可全文：`app/ui/public/licenses/lucide-animated-LICENSE`。

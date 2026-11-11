@@ -9,7 +9,8 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "lucide-static": "1.72.0",
     "typescript": "5.9.3",
-    "vite": "7.1.12"
+    "vite": "7.3.8"
   }
 }

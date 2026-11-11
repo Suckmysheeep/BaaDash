@@ -39,6 +39,7 @@ export interface Item {
 }
 
 export interface Settings {
+  accentColor?: string;
   proxy?: string;
   bindAddress?: string;
   interfaceScale?: number;
@@ -207,7 +208,8 @@ interface TauriGlobal {
 declare global {
   interface Window {
     __TAURI__: TauriGlobal;
-    setTheme(theme: string): void;
+    setTheme(theme: string, persist?: boolean): void;
+    setAccent(color: string, persist?: boolean): void;
   }
 }
 

@@ -1,7 +1,7 @@
 /* BaaDash — calm, precise desktop UI.
    Sidebar on the window background, content in an inset card, fine borders,
    small medium-weight type, quiet grey metadata. Neutral buttons; one system
-   blue used only for progress, selection and focus. Restrained form surfaces; functional icons use monochrome layers. */
+   blue used only for progress, selection and focus. Restrained form surfaces; functional icons use clear monochrome strokes. */
 
 @font-face {
   font-family: "SwiftDL Noto Sans SC";
@@ -2428,7 +2428,7 @@ code {
 
 
 /* BaaDash UI system: disclosure, form fields and navigation. See docs/UI-SPEC.md. */
-.kubai-icon { object-fit:contain; vertical-align:middle; user-select:none; }
+.lucide-icon { vertical-align:middle; user-select:none; transform-origin:center; }
 .settings { width:860px; max-width:calc(100vw - 40px); height:600px; max-height:calc(100vh - 48px); }
 .settings form { grid-template-columns:184px minmax(0,1fr); }
 .set-nav { padding:20px 10px; }
@@ -2482,12 +2482,12 @@ code {
 @media (prefers-reduced-motion:reduce) { .advanced-panel summary .ic { transition:none; } }
 
 /* Mono icon legibility: full-contrast marks, quiet secondary layers, no shadow. */
-.kubai-icon { color:var(--text-2); }
-.set-nav .kubai-icon { width:28px; height:28px; }
-.set-nav button.on .kubai-icon { color:var(--accent); }
-.set-nav button:not(.on) .kubai-icon { color:var(--text); }
-.btn .kubai-icon,.ghost-btn .kubai-icon,.nav-item .kubai-icon { width:20px; height:20px; }
-.advanced-panel summary .kubai-icon { width:22px; height:22px; }
+.lucide-icon { color:inherit; }
+.set-nav .lucide-icon { width:22px; height:22px; }
+.set-nav button.on .lucide-icon { color:var(--accent); }
+.set-nav button:not(.on) .lucide-icon { color:var(--text); }
+.btn .lucide-icon,.ghost-btn .lucide-icon,.nav-item .lucide-icon { width:20px; height:20px; }
+.advanced-panel summary .lucide-icon { width:22px; height:22px; }
 .control-glyph { color:inherit; }
 .form-select { appearance:none; padding-right:34px; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888b94' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 11px center; }
 .form-range { appearance:none; height:4px; border:0; border-radius:999px; cursor:pointer; background:linear-gradient(to right,var(--accent) 0 var(--range-progress,16.667%),var(--border-2) var(--range-progress,16.667%) 100%); }
@@ -2496,3 +2496,27 @@ code {
 .advanced-toggle input { appearance:none; border:1px solid var(--border-2); border-radius:4px; background:var(--panel); }
 .advanced-toggle input:checked { background:var(--accent); border-color:var(--accent); }
 .advanced-toggle input:checked::after { content:""; display:block; width:4px; height:8px; border:solid white; border-width:0 1.6px 1.6px 0; transform:rotate(45deg); margin:1px 0 0 5px; }
+/* Appearance controls share semantic tokens with real tasks. */
+.accent-section { padding:18px 16px; border-top:1px solid var(--border); }
+.accent-heading { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+.accent-heading .sr-text { display:grid; gap:5px; }
+.accent-heading .sr-text span { font-size:12px; line-height:1.6; color:var(--muted); }
+.accent-heading .ghost-btn { flex:none; font-size:12px; }
+.accent-presets { display:flex; flex-wrap:wrap; gap:12px; padding:18px 2px; }
+.accent-swatch { width:28px; height:28px; border:3px solid var(--panel); border-radius:50%; background:var(--swatch); box-shadow:0 0 0 1px var(--border-2); cursor:pointer; position:relative; }
+.accent-swatch[aria-pressed="true"] { box-shadow:0 0 0 2px var(--text); }
+.accent-swatch[aria-pressed="true"]::after { content:""; width:6px; height:6px; background:white; border-radius:50%; position:absolute; inset:0; margin:auto; }
+.accent-custom { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+.color-picker { width:34px; height:34px; border:1px solid var(--border-2); border-radius:8px; padding:4px; overflow:hidden; flex:none; }
+.color-picker input { appearance:none; width:100%; height:100%; background:transparent; border:0; padding:0; cursor:pointer; }
+.color-picker input::-webkit-color-swatch-wrapper { padding:0; }
+.color-picker input::-webkit-color-swatch { border:0; border-radius:4px; }
+.color-picker input::-moz-color-swatch { border:0; border-radius:4px; }
+.accent-hex-label { font-size:12px; color:var(--text-2); }
+.accent-hex { width:112px; min-width:0; font-variant-numeric:tabular-nums; }
+.accent-custom .field-help { font-size:11px; }
+.accent-preview { display:flex; align-items:center; gap:12px; margin-top:18px; padding:12px; border-radius:8px; background:var(--group); color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
+.accent-preview-label { color:var(--accent); background:var(--accent-soft); border-radius:5px; padding:3px 7px; }
+.accent-preview-track { height:4px; flex:1; border-radius:4px; background:var(--track); overflow:hidden; }
+.accent-preview-track i { display:block; height:100%; width:68%; border-radius:4px; background:var(--accent); }
+@media (prefers-reduced-motion:reduce) { .lucide-icon { transition:none !important; animation:none !important; } }

@@ -386,8 +386,8 @@ view.addEventListener("click", async (e) => {
 });
 
 // Theme: the saved choice, and any change made in Settings while open.
-invoke("get_state").then((s) => window.setTheme(s.settings.theme)).catch(() => {});
-listen("settings", (e) => window.setTheme(e.payload.theme));
+invoke("get_state").then((s) => { window.setTheme(s.settings.theme); window.setAccent(s.settings.accentColor || "#007aff", true); }).catch(() => {});
+listen("settings", (e) => { window.setTheme(e.payload.theme); window.setAccent(e.payload.accentColor || "#007aff", true); });
 
 if (params.has("confirm")) confirmView(Number(params.get("confirm")));
 else if (params.has("id")) progressView(Number(params.get("id")));

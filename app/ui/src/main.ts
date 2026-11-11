@@ -3,6 +3,8 @@ import { taskAdvanced, bindTaskAdvanced, resetTaskAdvanced, readTaskChecksum } f
 // in a normal browser, mock.ts stands in for the backend.
 
 import "./styles.css";
+import "./icon-motion";
+import { ACCENTS, validAccent } from "./accent";
 import { invoke, listen, currentWindow, $ } from "./api";
 import type {
   Item,
@@ -1709,14 +1711,36 @@ $("set-theme").addEventListener("click", (e) => {
   if (!b) return;
   setThemeChoice = b.dataset.v!;
   renderThemeChoice();
-  window.setTheme(setThemeChoice);
+  window.setTheme(setThemeChoice, false);
 });
-const restoreTheme = () => window.setTheme(settings().theme);
+const restoreTheme = () => { window.setTheme(settings().theme); window.setAccent(settings().accentColor || "#007aff", true); };
+let accentChoice = "#007aff";
+$("accent-presets").innerHTML = ACCENTS.map(([color, label]) => `<button type="button" class="accent-swatch" data-color="${color}" style="--swatch:${color}" aria-label="${label}" title="${label}" aria-pressed="false"></button>`).join("");
+function previewAccent(color: string) {
+  accentChoice = color.toLowerCase();
+  $("set-accent").value = accentChoice;
+  $("set-accent-hex").value = accentChoice.toUpperCase();
+  $("set-accent-hex").removeAttribute("aria-invalid");
+  $("accent-error").hidden = true;
+  $("accent-presets").querySelectorAll<HTMLElement>("[data-color]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.color === accentChoice)));
+  window.setAccent(accentChoice);
+}
+$("accent-presets").addEventListener("click", e => { const b = target(e).closest<HTMLElement>("[data-color]"); if (b) previewAccent(b.dataset.color!); });
+$("set-accent").addEventListener("input", () => previewAccent($("set-accent").value));
+$("set-accent-hex").addEventListener("input", () => {
+  const value = $("set-accent-hex").value.trim();
+  const valid = validAccent(value);
+  $("accent-error").hidden = valid;
+  $("set-accent-hex").setAttribute("aria-invalid", String(!valid));
+  if (valid) previewAccent(value);
+});
+$("accent-reset").onclick = () => previewAccent("#007aff");
 $("dlg-settings").addEventListener("cancel", restoreTheme); // Escape
 $("dlg-settings").addEventListener("close", restoreTheme);
 function openSettings(tab = "general") {
   const s = settings();
   setThemeChoice = s.theme || "system";
+  previewAccent(s.accentColor || "#007aff");
   renderThemeChoice();
   setSeed = s.seedUntil || "stop";
   renderSeed();
@@ -1825,9 +1849,10 @@ $("form-settings").addEventListener("submit", async (e) => {
   e.preventDefault();
   const clamp = (v: string, lo: number, hi: number, d: number) =>
     Math.min(hi, Math.max(lo, Number.parseInt(v, 10) || d));
+  if (!validAccent($("set-accent-hex").value.trim())) { showTab("appearance"); $("set-accent-hex").focus(); return; }
   if ($("set-proxy-mode").value === "manual" && !$("set-proxy").value.trim()) { showTab("network"); $("set-proxy").focus(); toast("请输入代理地址，或选择跟随系统。", "err"); return; }
   if ($("set-schedule-enabled").checked && !$("set-start-at").value) { showTab("automation"); $("set-start-at").focus(); toast("请选择队列开始时间。", "err"); return; }
-  await saveSettings({
+  try { await saveSettings({
     downloadDir: setDir || settings().downloadDir,
     sortIntoCategories: $("set-sort").checked,
     connections: clamp($("set-conns").value, 1, 32, 8),
@@ -1846,8 +1871,9 @@ $("form-settings").addEventListener("submit", async (e) => {
     closeToTray: $("set-tray").checked,
     onboardingDismissed: settings().onboardingDismissed,
     theme: setThemeChoice,
+    accentColor: accentChoice,
     seedUntil: setSeed,
-  });
+  }); } catch { return; } // The toast explains the failure; keep the draft open.
   $("dlg-settings").close();
   toast("设置已保存", "ok");
 });
@@ -1933,10 +1959,11 @@ $("update").addEventListener("click", async (e) => {
 async function boot() {
   hydrate();
   const s = await invoke("get_state");
-  listen("settings", (e) => { state.settings = e.payload; render(); });
+  listen("settings", (e) => { state.settings = e.payload; window.setTheme(e.payload.theme); window.setAccent(e.payload.accentColor || "#007aff", true); render(); });
   state.settings = s.settings;
   document.documentElement.style.zoom = String((s.settings.interfaceScale || 100) / 100);
   window.setTheme(s.settings.theme);
+  window.setAccent(s.settings.accentColor || "#007aff", true);
   state.pending = s.pending;
   state.version = s.version;
   $("version").textContent = `版本 ${s.version}`;

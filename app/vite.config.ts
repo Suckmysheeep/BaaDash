@@ -1,5 +1,5 @@
-import { defineConfig, transformWithEsbuild, type Plugin } from "vite";
-import { readFileSync } from "node:fs";
+import { defineConfig, type Plugin } from "vite";
+import { build } from "esbuild";
 import { resolve } from "node:path";
 
 // The theme script has to run before the page first draws, so it can't be
@@ -10,7 +10,8 @@ function inlineTheme(): Plugin {
   return {
     name: "inline-theme",
     async transformIndexHtml() {
-      const { code } = await transformWithEsbuild(readFileSync(file, "utf8"), file, { format: "iife", minify: true, target: "es2022" });
+      const result = await build({entryPoints: [file], bundle: true, write: false, format: "iife", minify: true, target: "es2022"});
+      const code = result.outputFiles[0].text;
       return [{ tag: "script", children: code, injectTo: "head-prepend" }];
     },
   };

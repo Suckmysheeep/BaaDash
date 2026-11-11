@@ -33,6 +33,7 @@ declare global {
     showProgressWindow: true,
     closeToTray: true,
     theme: "system",
+    accentColor: "#007aff",
     seedUntil: "stop",
   };
   if (VIDEO)
@@ -263,7 +264,7 @@ declare global {
       items: clone(),
       settings: { ...settings },
       pending: [],
-      version: "0.3.0",
+      version: "0.3.1",
     }),
     probe_url: async ({ url }) => {
       if (!VIDEO) await new Promise((r) => setTimeout(r, 700));
@@ -336,6 +337,7 @@ declare global {
     },
     set_settings: ({ settings: s }) => {
       settings = s;
+      emit("settings", { ...settings });
       schedule();
     },
     pick_folder: () => "C:\\Users\\you\\Desktop",
@@ -449,7 +451,7 @@ declare global {
     probe_note: () => null,
     show_main: () => {},
     check_update: () => ({
-      version: "0.3.0",
+      version: "0.3.1",
       page: "https://github.com/Suckmysheeep/BaaDash/releases/latest",
       asset: null,
     }),

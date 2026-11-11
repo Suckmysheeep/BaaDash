@@ -27,6 +27,7 @@ pub struct Settings {
     pub close_to_tray: bool,
     /// "system", "light" or "dark".
     pub theme: String,
+    pub accent_color: String,
     /// After a torrent finishes: "stop", a share ratio such as "1" or "2",
     /// or "forever".
     pub seed_until: String,
@@ -53,6 +54,7 @@ impl Default for Settings {
             show_progress_window: true,
             close_to_tray: true,
             theme: "system".into(),
+            accent_color: "#007aff".into(),
             seed_until: "stop".into(),
             proxy: String::new(),
             bind_address: String::new(),
@@ -76,5 +78,23 @@ pub fn native_settings() -> Option<Settings> {
         Ok(raw) => serde_json::from_slice(&raw).ok(),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Some(Settings::default()),
         Err(_) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn existing_settings_gain_default_accent_without_losing_preferences() {
+        let settings: Settings = serde_json::from_str(r##"{"theme":"dark","connections":16,"downloadDir":"downloads"}"##).unwrap();
+        assert_eq!(settings.accent_color, "#007aff");
+        assert_eq!(settings.theme, "dark");
+        assert_eq!(settings.connections, 16);
+        let mut updated = settings;
+        updated.accent_color = "#7c3aed".into();
+        let restored: Settings = serde_json::from_slice(&serde_json::to_vec(&updated).unwrap()).unwrap();
+        assert_eq!(restored.accent_color, "#7c3aed");
+        assert_eq!(restored.download_dir, PathBuf::from("downloads"));
     }
 }

@@ -292,6 +292,34 @@
                   <button type="button" data-v="system">跟随系统</button><button type="button" data-v="light">浅色</button><button type="button" data-v="dark">深色</button>
                 </div>
               </div>
+<div class="accent-section">
+<div class="accent-heading">
+<div class="sr-text">
+<b>强调色</b>
+<span>用于选中项、进度和焦点；自动适配深浅主题。</span>
+</div>
+<button type="button" class="ghost-btn" id="accent-reset">恢复默认</button>
+</div>
+<div id="accent-presets" class="accent-presets" role="group" aria-label="推荐强调色">
+</div>
+<div class="accent-custom">
+<label class="color-picker" title="选择自定义颜色">
+<input type="color" id="set-accent" aria-label="自选强调色">
+</label>
+<label class="accent-hex-label" for="set-accent-hex">自定义</label>
+<input class="form-input accent-hex" id="set-accent-hex" type="text" spellcheck="false" maxlength="7" aria-describedby="accent-error" autocomplete="off">
+<span class="field-help">取消时恢复原来的颜色</span>
+</div>
+<p id="accent-error" class="field-error" role="alert" hidden>请输入完整颜色值，例如 #007AFF。</p>
+<div class="accent-preview" aria-label="强调色预览">
+<span class="accent-preview-label">下载中</span>
+<div class="accent-preview-track">
+<i>
+</i>
+</div>
+<span>68%</span>
+</div>
+</div>
 <div class="set-row"><div class="sr-text"><b>界面大小</b><span>立即预览；取消时恢复原来的大小。</span></div><div class="scale-control"><input class="form-range" id="set-scale" type="range" min="90" max="150" step="10"><output id="scale-value">100%</output></div></div></div></section>
 <section data-panel="downloads" hidden><h2>下载与队列</h2><p class="lead">保存位置、任务并发和速度限制。</p><div class="set-group"><div class="set-row">
                 <div class="sr-text">

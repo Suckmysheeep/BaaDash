@@ -29,7 +29,7 @@ try {
    if(tab==='browser')assert.ok(await p.locator('.set-foot').isVisible(),'browser confirmation setting can be saved');
    const overflow=await p.locator('#dlg-settings').evaluate(e=>e.scrollWidth>e.clientWidth+1);
    assert.equal(overflow,false,theme+' '+tab+' horizontal overflow');
-   const color=await p.locator('#set-nav button:not(.on) .kubai-icon').first().evaluate(e=>getComputedStyle(e).color);
+   const color=await p.locator('#set-nav button:not(.on) .lucide-icon').first().evaluate(e=>getComputedStyle(e).color);
    const expected=await p.evaluate(()=>{const e=document.createElement('span');e.style.color='var(--text)';document.body.append(e);const color=getComputedStyle(e).color;e.remove();return color;});
    assert.equal(color,expected,'Mono navigation uses full foreground contrast');
    await capture(p,`settings-${tab}-${theme}`);
@@ -106,5 +106,5 @@ try {
  await capture(gallery,'components-dark');
  await gallery.locator('button[data-theme="light"]').click();await capture(gallery,'components-light');
  assert.deepEqual(errors,[]);assert.deepEqual(failed,[]);
- console.log('PASS: seven settings categories, conditional network/timer fields, both advanced checksum flows, reset, form styling, Kubai assets, themes, keyboard-ready native controls and narrow-window layout.');
+ console.log('PASS: seven settings categories, conditional network/timer fields, both advanced checksum flows, reset, form styling, Lucide glyphs, themes, keyboard-ready native controls and narrow-window layout.');
 } finally {await browser.close();server.close();}
