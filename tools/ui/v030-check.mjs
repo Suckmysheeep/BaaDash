@@ -1,0 +1,110 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import ts from '../../app/node_modules/typescript/lib/typescript.js';
+import {start,root} from './runtime.mjs';
+const iconSource=fs.readFileSync(path.join(root,'app/ui/src/icons.ts'),'utf8');
+const iconJS=ts.transpileModule(iconSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {icon}=await import('data:text/javascript;base64,'+Buffer.from(iconJS).toString('base64'));
+const componentPath=path.join(root,'tools/ui/components.html');
+fs.writeFileSync(componentPath,fs.readFileSync(componentPath,'utf8').replace(/<div class="icon-samples">[\s\S]*?<\/div>/,()=>'<div class="icon-samples">'+['download','appearance','network','clock'].map(icon).join('')+'</div>').trimEnd()+'\n');
+const {browser,server,origin}=await start();
+const shots=process.env.BAADASH_UI_SHOTS;
+if(shots)fs.mkdirSync(shots,{recursive:true});
+const errors=[],failed=[];
+const observe=p=>{p.on('pageerror',e=>errors.push(e.message));p.on('response',r=>{if(r.url().startsWith(origin)&&r.status()>=400)failed.push(r.url())});};
+const capture=async(p,name)=>{await p.evaluate(()=>document.fonts.ready);if(shots){await p.waitForTimeout(180);await p.screenshot({path:path.join(shots,name+'.png')});}};
+try {
+ const p=await browser.newPage({viewport:{width:1120,height:760}});observe(p);
+ await p.goto(origin+'/app/dist/index.html?video');await p.waitForSelector('.row');
+ const categories={general:'常规',appearance:'外观',downloads:'下载与队列',network:'网络',automation:'自动化',browser:'浏览器集成',about:null};
+ for(const theme of ['light','dark']) {
+  await p.evaluate(t=>window.setTheme(t),theme);
+  await p.locator('#btn-settings').click();
+  assert.equal(await p.locator('#set-nav [data-tab]').count(),7);
+  for(const [tab,title] of Object.entries(categories)) {
+   await p.locator(`[data-tab="${tab}"]`).click();
+   if(title)await p.locator(`[data-panel="${tab}"] h2`).filter({hasText:title}).waitFor({state:'visible'});
+   assert.ok(await p.locator('#settings-close').isVisible());
+   if(tab==='browser')assert.ok(await p.locator('.set-foot').isVisible(),'browser confirmation setting can be saved');
+   const overflow=await p.locator('#dlg-settings').evaluate(e=>e.scrollWidth>e.clientWidth+1);
+   assert.equal(overflow,false,theme+' '+tab+' horizontal overflow');
+   const color=await p.locator('#set-nav button:not(.on) .kubai-icon').first().evaluate(e=>getComputedStyle(e).color);
+   const expected=await p.evaluate(()=>{const e=document.createElement('span');e.style.color='var(--text)';document.body.append(e);const color=getComputedStyle(e).color;e.remove();return color;});
+   assert.equal(color,expected,'Mono navigation uses full foreground contrast');
+   await capture(p,`settings-${tab}-${theme}`);
+  }
+  await p.locator('[data-tab="network"]').click();
+  assert.equal(await p.locator('#set-proxy').isVisible(),false);
+  assert.equal(await p.locator('#set-bind').isVisible(),false);
+  await p.locator('#set-proxy-mode').selectOption('manual');
+  await p.locator('#set-proxy').fill('socks5h://127.0.0.1:1080');
+  await p.locator('#network-advanced summary').click();
+  await p.locator('#set-bind').fill('192.168.1.20');
+  await capture(p,`network-fields-${theme}`);
+  assert.equal(await p.locator('#set-proxy').evaluate(e=>getComputedStyle(e).borderRadius),'8px');
+  await p.locator('[data-tab="automation"]').click();
+  assert.equal(await p.locator('#set-start-at').isVisible(),false);
+  await p.locator('#set-schedule-enabled').check();
+  assert.ok(await p.locator('#set-start-at').isVisible());
+  await p.locator('#settings-close').click();
+ }
+ const placement=await p.evaluate(()=>Object.fromEntries(['set-proxy','set-bind','set-scale','set-start-at','set-finished','set-conns','set-clipboard','set-ask'].map(id=>[id,document.getElementById(id).closest('[data-panel]').dataset.panel])));
+ assert.deepEqual(placement,{'set-proxy':'network','set-bind':'network','set-scale':'appearance','set-start-at':'automation','set-finished':'automation','set-conns':'downloads','set-clipboard':'general','set-ask':'browser'});
+ await p.locator('#btn-add').click();
+ assert.equal(await p.locator('#add-advanced-host').isVisible(),false);
+ await p.locator('#add-url').fill('https://example.test/安装程序.exe');
+ await p.locator('#add-start').waitFor({state:'visible'});
+ await p.waitForFunction(()=>!document.querySelector('#add-start').disabled);
+ assert.equal(await p.locator('#add-checksum').isVisible(),false);
+ await capture(p,'new-download-default');
+ await p.locator('#add-advanced summary').click();
+ assert.equal(await p.locator('#add-checksum').isVisible(),false);
+ await p.locator('#add-verify').check();
+ await p.locator('#add-checksum').fill('not-a-hash');
+ await p.locator('#add-start').click();
+ assert.ok(await p.locator('#add-checksum-error').isVisible());
+ assert.equal(await p.locator('#dlg-add').evaluate(e=>e.open),true);
+ await capture(p,'new-download-error');
+ await p.locator('#add-checksum').fill('a'.repeat(64));
+ await p.locator('#add-verify').uncheck();
+ assert.equal(await p.locator('#add-checksum').inputValue(),'');
+ await p.locator('#add-x').click();
+ await p.locator('#btn-add').click();
+ assert.equal(await p.locator('#add-verify').isChecked(),false);
+ assert.equal(await p.locator('#add-advanced').evaluate(e=>e.open),false);
+ await p.locator('#add-x').click();
+ for(const width of [820,1120]) {
+  await p.setViewportSize({width,height:700});await p.locator('#btn-settings').click();
+  for(const tab of Object.keys(categories)) {
+   await p.locator(`[data-tab="${tab}"]`).click();
+   assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),tab+' overflow at '+width);
+   const rect=await p.locator('#settings-close').boundingBox();assert.ok(rect.x>=0&&rect.x+rect.width<=width);
+  }
+  await p.locator('#settings-close').click();
+ }
+ const q=await browser.newPage({viewport:{width:552,height:650}});observe(q);
+ await q.goto(origin+'/app/dist/download.html?confirm=1&video');
+ await q.waitForFunction(()=>!document.querySelector('#c-start')?.disabled);
+ assert.equal(await q.locator('#c-checksum').isVisible(),false);
+ await q.evaluate(()=>window.setTheme('dark'));await capture(q,'download-window-default-dark');
+ await q.locator('#c-advanced summary').click();await q.locator('#c-verify').check();
+ await q.locator('#c-checksum').fill('123');await q.locator('#c-start').click();
+ assert.ok(await q.locator('#c-checksum-error').isVisible());
+ await q.locator('#c-checksum').fill('b'.repeat(64));
+ await capture(q,'download-window-advanced-dark');
+ await q.evaluate(()=>window.setTheme('light'));await capture(q,'download-window-advanced-light');
+ assert.ok(await q.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ const inputs=q.locator('#c-checksum');assert.equal(await inputs.evaluate(e=>getComputedStyle(e).borderRadius),'8px');
+ await q.locator('#c-verify').uncheck();
+ await q.evaluate(()=>{const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>{if(cmd==='add_download')window.__submitted=args.req;return invoke(cmd,args)};});
+ await q.locator('#c-start').click();
+ await q.waitForFunction(()=>!!window.__submitted);
+ assert.equal(await q.evaluate(()=>window.__submitted.checksum),null);
+ const gallery=await browser.newPage({viewport:{width:1000,height:1000}});observe(gallery);
+ await gallery.goto(origin+'/tools/ui/components.html',{waitUntil:'networkidle'});
+ await capture(gallery,'components-dark');
+ await gallery.locator('button[data-theme="light"]').click();await capture(gallery,'components-light');
+ assert.deepEqual(errors,[]);assert.deepEqual(failed,[]);
+ console.log('PASS: seven settings categories, conditional network/timer fields, both advanced checksum flows, reset, form styling, Kubai assets, themes, keyboard-ready native controls and narrow-window layout.');
+} finally {await browser.close();server.close();}

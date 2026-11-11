@@ -8,6 +8,21 @@ BaaDash 的重要变更记录于此。格式参考 [Keep a Changelog](https://ke
 
 暂无。
 
+## [0.3.0] - 2026-11-11
+
+### 界面与交互
+
+- 设置重新划分为常规、外观、下载与队列、网络、自动化、浏览器集成和关于七类。
+- SHA-256 收入两个新建下载窗口的高级选项，按需开启文件校验；普通流程不再展示技术输入框。
+- 下载代理默认跟随系统，手动代理和定时开始按需展开；本地 IP 绑定位于网络高级选项。
+- 应用功能图标统一为 Kubai Icons 静态 SVG 单色适配，按需打包并保留 MIT 许可，离线可用。
+- 统一输入框、下拉框、折叠区域、设置行、焦点和错误状态，改善深浅色与窄窗口布局。
+- 新增 UI 规范、可预览组件页及开发约束，后续功能须明确归属、默认状态和出现时机。
+
+### 保留
+
+- 保留下载引擎、中文文件名、浏览器资源嗅探、图片/Pixiv/GIF、GIF 独立完成记录，以及分段和续传校验。
+
 ## [0.2.0] - 2026-11-11
 
 ### 修复
@@ -84,6 +99,7 @@ BaaDash 的首个正式版本，以新的项目身份发布，承接此前中文
 - 分享文本功能只提取普通链接，不增加站点专用解析，不绕过登录、会员、DRM 或网站访问限制。
 - 多连接不能突破实际带宽，速度取决于服务器、网络与磁盘；续传取决于服务器是否支持及文件是否变更。
 
-[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.1.0

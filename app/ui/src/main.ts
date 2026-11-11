@@ -1,3 +1,4 @@
+import { taskAdvanced, bindTaskAdvanced, resetTaskAdvanced, readTaskChecksum } from "./advanced";
 // BaaDash main window. Talks to the Rust backend through api.ts; opened
 // in a normal browser, mock.ts stands in for the backend.
 
@@ -43,7 +44,7 @@ const hydrate = () =>
   document.querySelectorAll<HTMLElement>("i[data-icon]").forEach((el) => {
     const tpl = document.createElement("template");
     tpl.innerHTML = icon(el.dataset.icon || "file");
-    const svg = tpl.content.firstElementChild as SVGElement;
+    const svg = tpl.content.firstElementChild as HTMLElement;
     if (el.className) svg.classList.add(...el.className.split(" "));
     el.replaceWith(svg);
   });
@@ -1049,7 +1050,7 @@ const limitEntries = (): MenuLine[] => [
     run: () => setLimit(k),
   })),
   "-",
-  { icon: "sliders", label: "自定义…", run: () => openSettings("speed") },
+  { icon: "sliders", label: "自定义…", run: () => openSettings("downloads") },
 ];
 $("limit-btn").onclick = (e) => {
   const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -1504,6 +1505,8 @@ const readClip = (): Promise<string | undefined> =>
     .then(firstUrl)
     .catch(() => undefined);
 function setState(kind: "idle" | "loading" | "error" | "done", msg = "") {
+  $("add-advanced-host").hidden = kind !== "done";
+  if (kind !== "done") resetTaskAdvanced("add");
   const el = $("add-state");
   el.className = `comp-state ${kind === "error" ? "err" : ""}`;
   el.innerHTML =
@@ -1647,11 +1650,13 @@ $("dlg-add").addEventListener("close", () => {
 async function submitAdd(start: boolean) {
   const filename = cleanFilename($("add-filename").value);
   if (!filename) return;
+  const checksum = readTaskChecksum("add");
+  if (checksum === undefined) return;
   const id = await call("add_download", {
     req: {
       url: $("add-url").value.trim(),
       filename,
-      checksum: $("add-checksum").value.trim() || null,
+      checksum,
       dir: add.dir || settings().downloadDir,
       headers: add.headers,
       start,
@@ -1725,8 +1730,15 @@ function openSettings(tab = "general") {
   $("set-tray").checked = s.closeToTray;
   loadIntegration();
   $("set-proxy").value = s.proxy || "";
+  $("set-proxy-mode").value = s.proxy ? "manual" : "system";
+  $("proxy-fields").hidden = !s.proxy;
+  ($("network-advanced") as unknown as HTMLDetailsElement).open = !!s.bindAddress;
+  $("set-schedule-enabled").checked = !!s.startAt;
+  $("schedule-fields").hidden = !s.startAt;
   $("set-bind").value = s.bindAddress || "";
   $("set-scale").value = String(s.interfaceScale || 100);
+  $("scale-value").textContent = (s.interfaceScale || 100) + "%";
+  $("set-scale").style.setProperty("--range-progress", ((Number($("set-scale").value)-90)/60*100)+"%");
   $("set-clipboard").checked = !!s.clipboardWatch;
   $("set-finished").value = s.whenFinished || "";
   const date = s.startAt ? new Date(s.startAt) : null;
@@ -1769,9 +1781,7 @@ function showTab(tab: string) {
     .querySelectorAll<HTMLElement>("[data-panel]")
     .forEach((p) => (p.hidden = p.dataset.panel !== tab));
   // Nothing to save on these tabs (Browser has a setting only once the store listing exists).
-  ($("dlg-settings").querySelector(".set-foot") as HTMLElement).hidden =
-    tab === "about" ||
-    (tab === "browser" && !state.integration?.storeAvailable);
+  ($("dlg-settings").querySelector(".set-foot") as HTMLElement).hidden = tab === "about";
 }
 $("set-nav").addEventListener("click", (e) => {
   const b = target(e).closest<HTMLElement>("[data-tab]");
@@ -1815,17 +1825,19 @@ $("form-settings").addEventListener("submit", async (e) => {
   e.preventDefault();
   const clamp = (v: string, lo: number, hi: number, d: number) =>
     Math.min(hi, Math.max(lo, Number.parseInt(v, 10) || d));
+  if ($("set-proxy-mode").value === "manual" && !$("set-proxy").value.trim()) { showTab("network"); $("set-proxy").focus(); toast("请输入代理地址，或选择跟随系统。", "err"); return; }
+  if ($("set-schedule-enabled").checked && !$("set-start-at").value) { showTab("automation"); $("set-start-at").focus(); toast("请选择队列开始时间。", "err"); return; }
   await saveSettings({
     downloadDir: setDir || settings().downloadDir,
     sortIntoCategories: $("set-sort").checked,
     connections: clamp($("set-conns").value, 1, 32, 8),
     maxConcurrent: clamp($("set-concurrent").value, 1, 10, 3),
     speedLimitKib: setLimitKib,
-    proxy: $("set-proxy").value.trim(),
+    proxy: $("set-proxy-mode").value === "manual" ? $("set-proxy").value.trim() : "",
     bindAddress: $("set-bind").value.trim(),
     interfaceScale: clamp($("set-scale").value, 90, 150, 100),
     clipboardWatch: $("set-clipboard").checked,
-    startAt: $("set-start-at").value ? new Date($("set-start-at").value).getTime() : null,
+    startAt: $("set-schedule-enabled").checked && $("set-start-at").value ? new Date($("set-start-at").value).getTime() : null,
     whenFinished: $("set-finished").value,
     askBeforeDownload: $("set-ask").checked,
     notifyOnComplete: $("set-notify").checked,
@@ -2059,7 +2071,9 @@ function askBulk(ids: number[], historyOnly = false) {
   dlg.showModal();
 }
 
-$("dlg-add").addEventListener("close", () => { $("add-checksum").value = ""; });
+$("add-advanced-host").innerHTML = taskAdvanced("add");
+bindTaskAdvanced("add");
+$("dlg-add").addEventListener("close", () => resetTaskAdvanced("add"));
 let lastClipboard = "";
 window.addEventListener("focus", async () => {
   if (!settings().clipboardWatch || document.querySelector("dialog[open]")) return;
@@ -2067,5 +2081,8 @@ window.addEventListener("focus", async () => {
   if (text && text !== lastClipboard && extractLinks(text).length) { lastClipboard = text; openBatch(text); }
 });
 
-$("set-scale").addEventListener("input", () => { document.documentElement.style.zoom = String(Math.min(150, Math.max(90, Number($("set-scale").value) || 100))/100); });
+$("set-scale").addEventListener("input", () => { $("set-scale").style.setProperty("--range-progress", ((Number($("set-scale").value)-90)/60*100)+"%"); $("scale-value").textContent = $("set-scale").value + "%"; document.documentElement.style.zoom = String(Math.min(150, Math.max(90, Number($("set-scale").value) || 100))/100); });
 $("dlg-settings").addEventListener("close", () => { document.documentElement.style.zoom = String((settings().interfaceScale || 100)/100); });
+
+$("set-proxy-mode").addEventListener("change", () => { $("proxy-fields").hidden = $("set-proxy-mode").value !== "manual"; });
+$("set-schedule-enabled").addEventListener("change", () => { $("schedule-fields").hidden = !$("set-schedule-enabled").checked; });

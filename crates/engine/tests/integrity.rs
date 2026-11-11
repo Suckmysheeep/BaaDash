@@ -13,6 +13,10 @@ impl Fixture {
         let worker=thread::spawn(move||while !running.load(Ordering::Relaxed){
             let Ok((mut stream,_))=listener.accept() else {thread::sleep(Duration::from_millis(5));continue;};
             let data=payload.clone();thread::spawn(move||{
+                // Winsock can inherit nonblocking mode from the listener.
+                // A request may not have arrived yet; a WouldBlock must not
+                // be treated as EOF and reset the client's connection.
+                stream.set_nonblocking(false).unwrap();
                 stream.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
                 let mut request_bytes=Vec::new();let mut buf=[0u8;2048];
                 while !request_bytes.windows(4).any(|b|b==b"\r\n\r\n") {let n=stream.read(&mut buf).unwrap_or(0);if n==0{return;}request_bytes.extend_from_slice(&buf[..n]);}

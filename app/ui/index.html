@@ -194,7 +194,7 @@
           </div>
         </div>
         <div class="comp-state" id="add-state"></div>
-<label class="comp-checksum" for="add-checksum">SHA-256（可选）<input id="add-checksum" maxlength="64" placeholder="输入文件发布者提供的校验值" autocomplete="off" spellcheck="false"></label>
+<div id="add-advanced-host" class="composer-advanced" hidden></div>
         <div class="chips" id="add-chips"></div>
         <div class="comp-foot">
           <button type="button" class="ghost-btn" id="add-paste">
@@ -254,21 +254,13 @@
     <!-- Settings -->
     <dialog id="dlg-settings" class="modal settings">
       <form method="dialog" id="form-settings">
-        <nav class="set-nav" id="set-nav">
-          <div class="set-nav-title">设置</div>
-          <button type="button" data-tab="general" class="on">
-            <i data-icon="sliders"></i>常规
-          </button>
-          <button type="button" data-tab="speed">
-            <i data-icon="gauge"></i>下载速度
-          </button>
-          <button type="button" data-tab="browser">
-            <i data-icon="globe"></i>浏览器
-          </button>
-          <button type="button" data-tab="about">
-            <i data-icon="info"></i>关于
-          </button>
-        </nav>
+        <nav class="set-nav" id="set-nav"><div class="set-nav-title">设置</div><button type="button" data-tab="general" class="on"><i data-icon="sliders"></i><span>常规</span></button>
+<button type="button" data-tab="appearance"><i data-icon="appearance"></i><span>外观</span></button>
+<button type="button" data-tab="downloads"><i data-icon="download"></i><span>下载与队列</span></button>
+<button type="button" data-tab="network"><i data-icon="network"></i><span>网络</span></button>
+<button type="button" data-tab="automation"><i data-icon="clock"></i><span>自动化</span></button>
+<button type="button" data-tab="browser"><i data-icon="globe"></i><span>浏览器集成</span></button>
+<button type="button" data-tab="about"><i data-icon="info"></i><span>关于</span></button></nav>
         <div class="set-main">
           <button
             type="button"
@@ -279,22 +271,29 @@
           >
             ×
           </button>
-          <section data-panel="general">
-            <h2>常规</h2>
-            <div class="set-group">
-              <div class="set-row">
+          <section data-panel="general"><h2>常规</h2><p class="lead">决定 BaaDash 如何与你一起工作。</p><div class="set-group"><label class="set-row"><div class="sr-text">
+                  <b>关闭后保留在系统托盘</b><span>关闭窗口后继续下载并保持浏览器集成运行</span>
+                </div>
+                <span class="switch"><input type="checkbox" id="set-tray"><i></i></span></label>
+<label class="set-row"><div class="sr-text">
+                  <b>完成通知</b><span>下载完成后通知我</span>
+                </div>
+                <span class="switch"><input type="checkbox" id="set-notify"><i></i></span></label>
+<label class="set-row"><div class="sr-text">
+                  <b>每个下载显示独立窗口</b><span>查看实时进度、连接状态和“下载完成”摘要</span>
+                </div>
+                <span class="switch"><input type="checkbox" id="set-progress-win"><i></i></span></label>
+<label class="set-row"><div class="sr-text"><b>检测剪贴板链接</b><span>切回应用时，发现新的下载链接再询问是否导入。</span></div><span class="switch"><input type="checkbox" id="set-clipboard"><i></i></span></label></div></section>
+<section data-panel="appearance" hidden><h2>外观</h2><p class="lead">让界面适合你的屏幕和阅读习惯。</p><div class="set-group"><div class="set-row">
                 <div class="sr-text">
                   <b>主题</b><span>跟随系统可自动匹配电脑的浅色或深色外观</span>
                 </div>
                 <div class="seg theme-seg" id="set-theme">
-                  <button type="button" data-v="system">跟随系统</button
-                  ><button type="button" data-v="light">浅色</button
-                  ><button type="button" data-v="dark">深色</button>
+                  <button type="button" data-v="system">跟随系统</button><button type="button" data-v="light">浅色</button><button type="button" data-v="dark">深色</button>
                 </div>
               </div>
-            </div>
-            <div class="set-group">
-              <div class="set-row">
+<div class="set-row"><div class="sr-text"><b>界面大小</b><span>立即预览；取消时恢复原来的大小。</span></div><div class="scale-control"><input class="form-range" id="set-scale" type="range" min="90" max="150" step="10"><output id="scale-value">100%</output></div></div></div></section>
+<section data-panel="downloads" hidden><h2>下载与队列</h2><p class="lead">保存位置、任务并发和速度限制。</p><div class="set-group"><div class="set-row">
                 <div class="sr-text">
                   <b>下载目录</b><span id="set-dir"></span>
                 </div>
@@ -302,126 +301,46 @@
                   更改…
                 </button>
               </div>
-              <label class="set-row"
-                ><div class="sr-text">
-                  <b>按文件类型分类</b
-                  ><span>将视频、音乐、程序和压缩文件分别保存到对应文件夹</span>
+<label class="set-row"><div class="sr-text">
+                  <b>按文件类型分类</b><span>将视频、音乐、程序和压缩文件分别保存到对应文件夹</span>
                 </div>
-                <span class="switch"
-                  ><input type="checkbox" id="set-sort" /><i></i></span
-              ></label>
-            </div>
-            <div class="set-group">
-              <label class="set-row"
-                ><div class="sr-text">
-                  <b>确认浏览器下载</b
-                  ><span>浏览器下载开始前显示“新建下载”窗口</span>
-                </div>
-                <span class="switch"
-                  ><input type="checkbox" id="set-ask" /><i></i></span
-              ></label>
-              <label class="set-row"
-                ><div class="sr-text">
-                  <b>完成通知</b><span>下载完成后通知我</span>
-                </div>
-                <span class="switch"
-                  ><input type="checkbox" id="set-notify" /><i></i></span
-              ></label>
-            </div>
-            <div class="set-group">
-              <div class="set-row col">
+                <span class="switch"><input type="checkbox" id="set-sort"><i></i></span></label></div><div class="set-group"><div class="set-row">
                 <div class="sr-text">
-                  <b>种子下载完成后</b
-                  ><span>继续做种可以帮助他人下载，已下载的文件不受影响。</span>
-                </div>
-                <div class="seg" id="set-seed">
-                  <button type="button" data-v="stop">停止做种</button
-                  ><button type="button" data-v="1">分享率 1</button
-                  ><button type="button" data-v="2">分享率 2</button
-                  ><button type="button" data-v="forever">持续做种</button>
-                </div>
-              </div>
-            </div>
-            <div class="set-group">
-              <label class="set-row"
-                ><div class="sr-text">
-                  <b>每个下载显示独立窗口</b
-                  ><span>查看实时进度、连接状态和“下载完成”摘要</span>
-                </div>
-                <span class="switch"
-                  ><input type="checkbox" id="set-progress-win" /><i></i></span
-              ></label>
-              <label class="set-row"
-                ><div class="sr-text">
-                  <b>关闭后保留在系统托盘</b
-                  ><span>关闭窗口后继续下载并保持浏览器集成运行</span>
-                </div>
-                <span class="switch"
-                  ><input type="checkbox" id="set-tray" /><i></i></span
-              ></label>
-            </div>
-          </section>
-          <section data-panel="speed" hidden>
-<div class="set-group"><div class="set-row extra-setting"><label for="set-proxy">下载代理（重启后生效）</label><input id="set-proxy" placeholder="留空跟随系统；http:// 或 socks5h://"></div>
-<div class="set-row extra-setting"><label for="set-bind">本地网络 IP（重启后生效）</label><input id="set-bind" placeholder="留空自动选择"></div>
-<div class="set-row extra-setting"><label for="set-scale">界面大小（90–150%）</label><input id="set-scale" type="number" min="90" max="150" step="10"></div>
-<div class="set-row extra-setting"><label><input id="set-clipboard" type="checkbox">切回应用时检测剪贴板下载链接</label></div>
-<div class="set-row extra-setting"><label for="set-start-at">队列开始时间（留空立即）</label><input id="set-start-at" type="datetime-local"></div>
-<div class="set-row extra-setting"><label for="set-finished">全部成功完成后（仅执行一次）</label><select id="set-finished"><option value="">不操作</option><option value="close">退出 BaaDash</option><option value="sleep">休眠</option><option value="shutdown">关机</option></select></div></div>
-            <h2>下载速度</h2>
-            <div class="set-group">
-              <div class="set-row">
-                <div class="sr-text">
-                  <b>每个任务的连接数</b
-                  ><span>服务器限制单连接速度时，增加连接数通常更快</span>
+                  <b>每个任务的连接数</b><span>服务器限制单连接速度时，增加连接数通常更快</span>
                 </div>
                 <div class="stepper" data-for="set-conns">
-                  <button type="button" data-d="-1">−</button
-                  ><input
-                    id="set-conns"
-                    type="number"
-                    min="1"
-                    max="32"
-                  /><button type="button" data-d="1">+</button>
+                  <button type="button" data-d="-1">−</button><input id="set-conns" type="number" min="1" max="32"><button type="button" data-d="1">+</button>
                 </div>
               </div>
-              <div class="set-row">
+<div class="set-row">
                 <div class="sr-text">
                   <b>同时下载任务数</b><span>其余任务将在队列中等待</span>
                 </div>
                 <div class="stepper" data-for="set-concurrent">
-                  <button type="button" data-d="-1">−</button
-                  ><input
-                    id="set-concurrent"
-                    type="number"
-                    min="1"
-                    max="10"
-                  /><button type="button" data-d="1">+</button>
+                  <button type="button" data-d="-1">−</button><input id="set-concurrent" type="number" min="1" max="10"><button type="button" data-d="1">+</button>
                 </div>
               </div>
-            </div>
-            <div class="set-group">
-              <div class="set-row col">
+<div class="set-row col">
                 <div class="sr-text">
                   <b>下载限速</b><span>所有下载任务共享此速度上限</span>
                 </div>
                 <div class="seg" id="set-limits"></div>
-                <label class="custom"
-                  >自定义
-                  <input
-                    id="set-limit-custom"
-                    type="number"
-                    min="0"
-                    step="64"
-                    placeholder="—"
-                  />
-                  KB/s</label
-                >
-              </div>
-            </div>
-          </section>
-          <section data-panel="browser" hidden>
-            <h2>浏览器扩展</h2>
+                <label class="custom">自定义
+                  <input id="set-limit-custom" type="number" min="0" step="64" placeholder="—">
+                  KB/s</label>
+              </div></div><div class="set-group"><div class="set-row col">
+                <div class="sr-text">
+                  <b>种子下载完成后</b><span>继续做种可以帮助他人下载，已下载的文件不受影响。</span>
+                </div>
+                <div class="seg" id="set-seed">
+                  <button type="button" data-v="stop">停止做种</button><button type="button" data-v="1">分享率 1</button><button type="button" data-v="2">分享率 2</button><button type="button" data-v="forever">持续做种</button>
+                </div>
+              </div></div></section>
+<section data-panel="network" hidden><h2>网络</h2><p class="lead">默认跟随系统网络设置，修改后重启应用生效。</p><div class="set-group"><div class="set-row"><div class="sr-text"><b>代理方式</b><span>仅在需要时设置手动代理。</span></div><select class="form-select" id="set-proxy-mode" aria-label="代理方式"><option value="system">跟随系统</option><option value="manual">手动代理</option></select></div><div class="setting-fields" id="proxy-fields" hidden><div class="form-field"><label for="set-proxy">代理地址</label><input class="form-input" id="set-proxy" type="text" placeholder="socks5h://127.0.0.1:1080" autocomplete="off" spellcheck="false"><p class="field-help">支持 HTTP、HTTPS、SOCKS5 和 SOCKS5H。</p></div></div></div><details class="advanced-panel" id="network-advanced"><summary><i data-icon="sliders"></i><span>高级网络选项</span><i data-icon="chevDown"></i></summary><div class="advanced-body"><div class="form-field"><label for="set-bind">绑定本地 IP</label><input class="form-input" id="set-bind" type="text" placeholder="自动选择" autocomplete="off" spellcheck="false"><p class="field-help">通常无需填写。使用 VPN 或多网卡时，可指定下载使用的本地 IP；留空自动选择。</p></div></div></details></section>
+<section data-panel="automation" hidden><h2>自动化</h2><p class="lead">安排下载时间，以及任务全部成功后的动作。</p><div class="set-group"><label class="set-row"><div class="sr-text"><b>定时开始队列</b><span>到达指定时间后，再启动等待中的任务。</span></div><span class="switch"><input type="checkbox" id="set-schedule-enabled"><i></i></span></label>
+<div class="setting-fields" id="schedule-fields" hidden><div class="form-field"><label for="set-start-at">开始时间</label><input class="form-input" id="set-start-at" type="datetime-local"><p class="field-help">使用这台电脑的本地时间。</p></div></div></div><div class="set-group"><div class="set-row col"><div class="sr-text"><b>全部下载成功后</b><span>仅执行一次；有失败、暂停或等待任务时不会触发。</span></div><select class="form-select" id="set-finished" aria-label="全部下载成功后的动作"><option value="">不操作</option><option value="close">退出 BaaDash</option><option value="sleep">休眠</option><option value="shutdown">关机</option></select></div></div></section>
+<section data-panel="browser" hidden>
+            <h2>浏览器集成</h2>
             <p class="lead">
               扩展会将浏览器下载交给 BaaDash，并携带 Cookie
               以下载需要登录的文件，还会为视频添加下载按钮。
@@ -433,30 +352,23 @@
               <b>下载前询问每个文件的保存位置</b>，只让 BaaDash 询问。
             </p>
             <div class="set-group">
-              <label class="set-row"
-                ><div class="sr-text">
-                  <b>自动推荐扩展</b
-                  ><span>支持的浏览器将在下次启动时询问一次</span>
+              <label class="set-row"><div class="sr-text">
+                  <b>自动推荐扩展</b><span>支持的浏览器将在下次启动时询问一次</span>
                 </div>
-                <span class="switch"
-                  ><input type="checkbox" id="set-offer" /><i></i></span
-              ></label>
+                <span class="switch"><input type="checkbox" id="set-offer"><i></i></span></label>
             </div>
-          </section>
-          <section data-panel="about" hidden>
+          <div class="set-group"><label class="set-row"><div class="sr-text">
+                  <b>确认浏览器下载</b><span>浏览器下载开始前显示“新建下载”窗口</span>
+                </div>
+                <span class="switch"><input type="checkbox" id="set-ask"><i></i></span></label></div></section>
+<section data-panel="about" hidden>
             <div class="about">
               <div class="about-lockup">
-                <img
-                  class="about-brand-icon"
-                  src="brand-icon.svg"
-                  alt="BaaDash"
-                  width="84"
-                  height="84"
-                />
+                <img class="about-brand-icon" src="brand-icon.svg" alt="BaaDash" width="84" height="84">
               </div>
               <p id="version"></p>
               <p class="muted">
-                多连接高速下载，随时随地断点续传。<br />免费且开源。
+                多连接高速下载，随时随地断点续传。<br>免费且开源。
               </p>
             </div>
             <div class="set-group">
@@ -470,10 +382,7 @@
               </div>
               <div class="set-row">
                 <div class="sr-text">
-                  <b>调试日志</b
-                  ><span
-                    >记录 BaaDash 的运行情况和错误，报告问题时请附上日志。</span
-                  >
+                  <b>调试日志</b><span>记录 BaaDash 的运行情况和错误，报告问题时请附上日志。</span>
                 </div>
                 <button type="button" class="btn sm" id="set-log">
                   打开日志
