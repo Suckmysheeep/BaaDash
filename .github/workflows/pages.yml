@@ -1,9 +1,13 @@
 name: Site
 
-# The upstream site is kept as reference material. Deploy it manually only
-# after configuring this independent repository's own GitHub Pages domain.
+# Publish the static BaaDash website from main/site to GitHub Pages.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:

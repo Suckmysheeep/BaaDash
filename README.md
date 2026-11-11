@@ -20,7 +20,7 @@
   <img src="docs/assets/zh-cn/main-light.png" width="1120" alt="BaaDash 下载列表：分类、实时进度与批量管理">
 </picture>
 
-[功能](#功能) · [下载安装](#下载安装) · [浏览器扩展](#浏览器扩展) · [界面预览](#界面预览) · [开发与构建](#开发与构建) · [更新记录](CHANGELOG.md)
+[官网](https://suckmysheeep.github.io/BaaDash/) · [功能](#功能) · [下载安装](#下载安装) · [浏览器扩展](#浏览器扩展) · [界面预览](#界面预览) · [开发与构建](#开发与构建) · [更新记录](CHANGELOG.md)
 
 </div>
 
