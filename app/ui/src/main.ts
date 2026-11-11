@@ -281,7 +281,7 @@ function renderNav() {
     n: number,
     extra = "",
   ) =>
-    `<button class="nav-item ${state.view === view ? "on" : ""}" data-view="${view}"><span class="ni-icon">${ic}</span><span class="ni-label">${label}</span>${extra}<span class="ni-count">${n || ""}</span></button>`;
+    `<button class="nav-item ${state.view === view && !$("dlg-settings").open ? "on" : ""}" data-view="${view}"><span class="ni-icon">${ic}</span><span class="ni-label">${label}</span>${extra}<span class="ni-count">${n || ""}</span></button>`;
   let html =
     item("all", "全部任务", icon("inbox"), state.items.length) +
     item(
@@ -338,7 +338,7 @@ function renderNav() {
 function renderHeader(list: Item[]) {
   const v = VIEWS[state.view];
   $("h-icon").innerHTML = v ? icon(v.icon) : typeIcon(state.view);
-  $("h-name").textContent = v ? v.name : categoryLabel(state.view);
+  $("h-name").textContent = $("dlg-settings").open ? "设置" : v ? v.name : categoryLabel(state.view);
   $("h-count").textContent = list.length ? String(list.length) : "";
   $("btn-pause-all").hidden = !list.some(isActive);
   $("btn-resume-all").hidden = !list.some(
@@ -541,6 +541,8 @@ async function loadIntegration() {
     if (loadedOnce) toast(`已在 ${who?.name || "浏览器"} 中连接`, "ok");
   }
   loadedOnce = true;
+  $("browser-entry").querySelector('.ni-label')!.textContent=now?.lastSeen?'浏览器已连接':'浏览器集成';
+  $("browser-entry").classList.toggle('connected',!!now?.lastSeen);
   renderOnboard();
   if ($("dlg-settings").open) renderBrowserPanel();
 }
@@ -1024,7 +1026,8 @@ $("btn-resume-all").onclick = () =>
       .map((i) => i.id),
   );
 $("btn-add").onclick = $("empty-add").onclick = () => openComposer();
-$("btn-palette").onclick = $("btn-search").onclick = () => openPalette();
+function openTaskSearch(){if($("dlg-settings").open){void requestSettingsClose().then(ok=>{if(ok)openPalette();});}else openPalette();}
+$("btn-palette").onclick = $("btn-search").onclick = openTaskSearch;
 $("btn-settings").onclick = () => openSettings();
 $("browser-entry").onclick = () => openSettings('browser');
 $("inspect-threads").onclick = () => { const id=renderMatrix(state.items,state.selected);if(id!==null)select(id); };
@@ -1035,7 +1038,9 @@ $("theme-toggle").onclick=async()=>{const next=document.documentElement.dataset.
 
 $("empty-ext").onclick = () => openExtensionGuide();
 $("w-min").onclick = () => appWindow?.minimize();
-$("w-max").onclick = () => appWindow?.toggleMaximize();
+async function syncFrame(){if(!appWindow)return;try{const maximized=await appWindow.isMaximized();document.documentElement.dataset.maximized=String(maximized);$("w-max").title=maximized?'还原窗口':'最大化';$("w-max").setAttribute('aria-label',$("w-max").title);}catch{/* Window may be closing. */}}
+$("w-max").onclick = async () => {await appWindow?.toggleMaximize();await syncFrame();};
+if(appWindow){void syncFrame();void appWindow.onResized(()=>{void syncFrame();});}
 $("w-close").onclick = () => appWindow?.close();
 if (!appWindow) $("win-ctrls").hidden = true;
 
@@ -1063,7 +1068,7 @@ document.addEventListener("keydown", (e) => {
     k = e.key;
   if (mod && k.toLowerCase() === "k") {
     e.preventDefault();
-    if (!$("dlg-palette").open) openPalette();
+    if (!$("dlg-palette").open) openTaskSearch();
     return;
   }
   if (document.querySelector("dialog[open]") || target(e).matches?.("input"))
@@ -1780,6 +1785,7 @@ function openSettings(tab = "general") {
   $("dlg-settings").show();
   settingsSnapshot = settingsDraftKey();
   $("btn-settings").classList.add("on");
+  renderNav();renderHeader(visible());
   $("settings-close").focus();
 }
 function renderLimits() {
@@ -1853,7 +1859,7 @@ async function requestSettingsClose():Promise<boolean>{
 }
 $("settings-close").onclick=()=>{void requestSettingsClose();};
 $("set-cancel").onclick=()=>{restoreTheme();$("dlg-settings").close();};
-$("dlg-settings").addEventListener('close',()=>{$("btn-settings").classList.remove('on');updateThemeToggle();});
+$("dlg-settings").addEventListener('close',()=>{$("btn-settings").classList.remove('on');updateThemeToggle();renderNav();renderHeader(visible());});
 document.addEventListener('keydown',e=>{if(e.key==='Escape' && $("dlg-settings").open && !document.querySelector('dialog[open]:not(#dlg-settings)')){e.preventDefault();void requestSettingsClose();}});
 async function saveSettings(s: Settings) {
   await call("set_settings", { settings: s });

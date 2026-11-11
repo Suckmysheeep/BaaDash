@@ -19,3 +19,5 @@ html,body{background:var(--bg);border-radius:0}body{font-size:13px}.app{display:
 @media(max-height:650px){.side-top{margin-bottom:9px}.sidebar{padding-top:8px}.nav-item{min-height:29px;height:29px;font-size:11px}.nav-sec{margin-top:9px}.side-bottom{padding-top:4px;gap:2px}.side-foot{padding-top:0}.side-foot .sq-btn{height:25px}.telemetry{min-height:139px;margin-bottom:11px}.speed-monitor,.thread-monitor{padding-top:10px;padding-bottom:8px}.speed-layout{margin-top:10px}#net-graph{height:61px}.thread-grid{height:58px}.list-toolbar{padding-bottom:9px}}
 .m-size{min-width:0}.r-title{min-height:19px}
 :root[data-density=comfortable] .row{min-height:64px;height:64px}#set-density button{font-size:10px;padding:5px 10px}
+#browser-entry:not(.connected) .connection-dot{background:var(--muted)}
+html[data-maximized=true] .app{padding:0}html[data-maximized=true] .main.workspace{border-radius:0;border-width:0 0 0 1px}html[data-maximized=true] #dlg-settings{top:50px;right:0;bottom:26px;border-radius:0}

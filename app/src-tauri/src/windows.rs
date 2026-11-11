@@ -7,17 +7,17 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder}
 pub fn polish(window: &WebviewWindow) {
     #[cfg(windows)]
     if let Ok(hwnd) = window.hwnd() {
-        let native_round = unsafe { native_shape(hwnd.0, window.is_maximized().unwrap_or(false)) };
-        // Windows 10 has no DWM corner API. Its real window region is clipped
-        // instead; disable its rectangular system shadow in that fallback.
-        if !native_round { let _ = window.set_shadow(false); }
+        // The real region owns the contour on both Windows 10 and 11.
+        // Avoid a rectangular compositor shadow around the clipped region.
+        let _ = window.set_shadow(false);
+        unsafe { native_shape(hwnd.0, window.is_maximized().unwrap_or(false)); }
     }
     #[cfg(not(windows))]
     let _ = window;
 }
 
 #[cfg(windows)]
-unsafe fn native_shape(hwnd: *mut std::ffi::c_void, maximized: bool) -> bool {
+unsafe fn native_shape(hwnd: *mut std::ffi::c_void, maximized: bool) {
     use std::ffi::c_void;
     #[repr(C)]
     struct Rect { left: i32, top: i32, right: i32, bottom: i32 }
@@ -34,13 +34,12 @@ unsafe fn native_shape(hwnd: *mut std::ffi::c_void, maximized: bool) -> bool {
         fn CreateRoundRectRgn(left:i32, top:i32, right:i32, bottom:i32, width:i32, height:i32) -> *mut c_void;
         fn DeleteObject(object: *mut c_void) -> i32;
     }
-    let preference: u32 = if maximized { 1 } else { 2 };
+    let preference: u32 = 1; // DWM does not add a second, competing contour.
     let border: u32 = 0xffff_fffe;
     unsafe {
-        let result = DwmSetWindowAttribute(hwnd, 33, (&preference as *const u32).cast(), 4);
+        DwmSetWindowAttribute(hwnd, 33, (&preference as *const u32).cast(), 4);
         DwmSetWindowAttribute(hwnd, 34, (&border as *const u32).cast(), 4);
-        if result >= 0 { return true; }
-        if maximized { SetWindowRgn(hwnd, std::ptr::null_mut(), 1); return false; }
+        if maximized { SetWindowRgn(hwnd, std::ptr::null_mut(), 1); return; }
         let mut rect = Rect { left:0, top:0, right:0, bottom:0 };
         if GetWindowRect(hwnd, &mut rect) != 0 {
             let diameter = ((24 * GetDpiForWindow(hwnd).max(96)) / 96) as i32;
@@ -48,7 +47,6 @@ unsafe fn native_shape(hwnd: *mut std::ffi::c_void, maximized: bool) -> bool {
             // Ownership transfers to the OS on success.
             if !region.is_null() && SetWindowRgn(hwnd, region, 1) == 0 { DeleteObject(region); }
         }
-        false
     }
 }
 
@@ -85,8 +83,7 @@ pub fn open(app: &AppHandle, label: &str, query: &str, title: &str) -> tauri::Re
     }
     let (app, label, query, title) = (app.clone(), label.to_string(), query.to_string(), title.to_string());
     std::thread::spawn(move || {
-        // Transparent and frameless: the page draws the whole window (rounded
-        // card and shadow), so no native frame, border or unpainted edge shows.
+        // Opaque and frameless: native geometry clips the outer window.
         let built = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(format!("download.html?{query}").into()))
             .title(&title)
             .inner_size(WINDOW_WIDTH, 360.0)
@@ -94,7 +91,7 @@ pub fn open(app: &AppHandle, label: &str, query: &str, title: &str) -> tauri::Re
             .maximizable(false)
             .decorations(false)
             .transparent(false)
-            .shadow(true)
+            .shadow(false)
             .center()
             .focused(true)
             .always_on_top(true)

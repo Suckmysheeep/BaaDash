@@ -146,18 +146,18 @@ declare global {
     item("海岸日记-4K.mp4", 2.8 * GB, "downloading", 3, {
       frac: 0.58,
     }),
-    item("鸡你太美-高清重制版.mp4", 812 * MB, "downloading", 5, { frac: 0.24 }),
+    item("产品演示-高清版.mp4", 812 * MB, "downloading", 5, { frac: 0.24 }),
     item("BaaDash-安装程序.msi", 412 * MB, "queued", 6),
-    item("电子木鱼-赛博功德-无损音质.flac", 286 * MB, "paused", 75, {
+    item("会议录音-无损音轨.flac", 286 * MB, "paused", 75, {
       frac: 0.34,
     }),
-    item("猫猫虫打工日记-全集.tar.gz", 3.4 * GB, "error", 180, {
+    item("项目素材-归档.tar.gz", 3.4 * GB, "error", 180, {
       frac: 0.31,
       error: "服务器返回 403 禁止访问（链接可能已过期）",
     }),
-    item("大学生期末速成-看完不挂科.pdf", 14.2 * MB, "completed", 40),
-    item("甲方最终版-真的不改了.zip", 88 * MB, "completed", 1500),
-    item("深夜电台-第12集.mp3", 61 * MB, "completed", 4000),
+    item("技术手册-网络协议.pdf", 14.2 * MB, "completed", 40),
+    item("设计资源-组件库.zip", 88 * MB, "completed", 1500),
+    item("音频素材-第12段.mp3", 61 * MB, "completed", 4000),
   ];
 
   type Listener = (e: { payload: unknown }) => void;
@@ -481,7 +481,7 @@ declare global {
     probe_media: async () => {
       if (!VIDEO) await new Promise((r) => setTimeout(r, 900));
       return {
-        title: "奶龙写真 4K · 高清重制版",
+        title: "海岸日记 4K · 高清素材",
         site: "示例站点",
         duration: 634,
         qualities: [
