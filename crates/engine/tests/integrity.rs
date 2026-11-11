@@ -13,6 +13,10 @@ impl Fixture {
         let worker=thread::spawn(move||while !running.load(Ordering::Relaxed){
             let Ok((mut stream,_))=listener.accept() else {thread::sleep(Duration::from_millis(5));continue;};
             let data=payload.clone();thread::spawn(move||{
+                // Winsock can inherit nonblocking mode from the listener.
+                // A request may not have arrived yet; a WouldBlock must not
+                // be treated as EOF and reset the client's connection.
+                stream.set_nonblocking(false).unwrap();
                 stream.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
                 let mut request_bytes=Vec::new();let mut buf=[0u8;2048];
                 while !request_bytes.windows(4).any(|b|b==b"\r\n\r\n") {let n=stream.read(&mut buf).unwrap_or(0);if n==0{return;}request_bytes.extend_from_slice(&buf[..n]);}
@@ -36,16 +40,7 @@ async fn download(f:&Fixture,dest:PathBuf)->anyhow::Result<Outcome>{
     // These byte-integrity fixtures only talk to loopback. Do not let the
     // runner's proxy discovery or proxy settings affect local test traffic.
     let client=Client::builder().no_proxy().http1_only().build()?;
-    for attempt in 0..3 {
-        let result=run(&client,&Request{url:f.url.clone(),dest:dest.clone(),connections:4,headers:HeaderMap::new(),restart:false},Arc::new(Progress::default()),CancellationToken::new(),Arc::new(SpeedLimiter::new(0))).await;
-        // Windows hosted runners can abort the first loopback connection.
-        // Retry only those OS transport errors, never integrity assertions,
-        // HTTP responses, file operations, or the expected overwrite refusal.
-        let transient=cfg!(windows)&&result.as_ref().err().is_some_and(|error|error.chain().any(|cause|cause.downcast_ref::<std::io::Error>().is_some_and(|io|matches!(io.raw_os_error(),Some(10053|10054|10061)))));
-        if !transient||attempt==2{return result;}
-        tokio::time::sleep(Duration::from_millis(50*(attempt+1))).await;
-    }
-    unreachable!()
+    run(&client,&Request{url:f.url.clone(),dest,connections:4,headers:HeaderMap::new(),restart:false},Arc::new(Progress::default()),CancellationToken::new(),Arc::new(SpeedLimiter::new(0))).await
 }
 #[tokio::test]
 async fn truncated_resume_file_is_restarted_and_bytes_match(){

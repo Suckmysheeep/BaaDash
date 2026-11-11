@@ -13,7 +13,7 @@ const shots=process.env.BAADASH_UI_SHOTS;
 if(shots)fs.mkdirSync(shots,{recursive:true});
 const errors=[],failed=[];
 const observe=p=>{p.on('pageerror',e=>errors.push(e.message));p.on('response',r=>{if(r.url().startsWith(origin)&&r.status()>=400)failed.push(r.url())});};
-const capture=async(p,name)=>{await p.evaluate(()=>document.fonts.ready);if(shots)await p.screenshot({path:path.join(shots,name+'.png')});};
+const capture=async(p,name)=>{await p.evaluate(()=>document.fonts.ready);if(shots){await p.waitForTimeout(180);await p.screenshot({path:path.join(shots,name+'.png')});}};
 try {
  const p=await browser.newPage({viewport:{width:1120,height:760}});observe(p);
  await p.goto(origin+'/app/dist/index.html?video');await p.waitForSelector('.row');
