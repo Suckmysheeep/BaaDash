@@ -31,7 +31,7 @@ fs.writeFileSync(homePath, home.replace(summary, `BaaDash v${version} 已发布`
 const pagePath = path.join(root, "site/changelog.html");
 const page = fs.readFileSync(pagePath, "utf8");
 if (!/<main class="document">[\s\S]*?<\/main>/.test(page)) throw new Error("更新记录页面结构不匹配");
-fs.writeFileSync(pagePath, page.replace(/<main class="document">[\s\S]*?<\/main>/, `<main class="document">
+fs.writeFileSync(pagePath, page.replace(/<main class="document">[\s\S]*?<\/main>/, () => `<main class="document">
       <div class="eyebrow">CHANGELOG</div>
       <h1>每一次更新，都有记录。</h1>
       <p class="lede">v${version} · ${date}</p>

@@ -81,4 +81,5 @@ jobs:
       - run: npm ci --prefix app
       - run: npm run build --prefix app
       - run: npm ci --prefix tools/ui
+      - run: node tools/site/build.mjs
       - run: npm run test --prefix tools/ui
