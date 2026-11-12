@@ -221,10 +221,12 @@ async function mediaView(token: number, inc: Incoming, settings: Settings, heade
 async function torrentView(token: number, inc: Incoming, settings: Settings, headers: Header[]) {
   let dir = settings.downloadDir, info: TorrentInfo | null = null;
   const magnet = inc.url.startsWith("magnet:");
+  const local = !magnet && !/^https?:/i.test(inc.url);
+  const kind = magnet ? "磁力链接" : local ? "种子文件" : "种子链接";
   view.innerHTML = `
-    <div class="d-head">${glyph("Compressed")}<div class="d-name"><input id="c-name" spellcheck="false" placeholder="${magnet ? "正在向节点查询种子信息…" : "正在读取种子…"}" readonly><div class="d-sub"><span class="st">${magnet ? "磁力链接" : "Torrent 种子"}</span></div></div></div>
+    <div class="d-head">${glyph("Compressed")}<div class="d-name"><input id="c-name" spellcheck="false" placeholder="${magnet ? "正在向节点查询种子信息…" : "正在读取种子…"}"><div class="d-sub"><span class="st">${kind}</span></div></div></div>
     <div class="t-files" id="t-files"><div class="t-wait"><span class="spinner"></span><span class="muted">${magnet ? "正在寻找分享此资源的节点，可能需要几秒钟。" : "正在读取文件列表…"}</span></div></div>
-    <div class="kv">
+    <div class="kv" id="t-kv">
       <span class="k">已选择</span><span class="v" id="t-sel">—</span>
       <span class="k">保存到</span><span class="v"><span class="path" id="c-dir" title=""></span><button class="btn sm" id="c-browse">更改</button></span>
     </div>
@@ -243,13 +245,42 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
     $("c-start").disabled = $("c-later").disabled = sel.length === 0;
     const all = $("t-all"); if (all) all.checked = sel.length === info!.files.length;
   };
+  // Filters only change which rows are visible; checked files stay chosen.
+  let query = "", chip = "";
+  const filterRows = () => {
+    view.querySelectorAll<HTMLElement>(".t-file[data-cat]").forEach((row) => {
+      row.hidden = !!(chip && row.dataset.cat !== chip) || !!(query && !row.dataset.name!.includes(query));
+    });
+  };
   let elapsed = 0, timer = 0;
   const waitMsg = () => (magnet ? `正在寻找分享此资源的节点… 已等待 ${elapsed} 秒` : "正在读取文件列表…") + (magnet && elapsed >= 20 ? "（节点较少时可能更久，可随时取消）" : "");
   const fill = () => {
     $("c-name").value = info!.name;
-    const many = info!.files.length > 1;
-    $("t-files").innerHTML = (many ? `<label class="t-file t-allrow"><input type="checkbox" id="t-all" checked><span>全部文件</span><span class="muted">${bytes(info!.size)}</span></label>` : "") +
-      info!.files.map((f, i) => `<label class="t-file"><input type="checkbox" data-i="${i}" checked><span title="${esc(f.path)}">${esc(f.path)}</span><span class="muted">${bytes(f.size)}</span></label>`).join("");
+    const files = info!.files;
+    const many = files.length > 1;
+    const cats = new Map<string, number>();
+    for (const f of files) cats.set(catOf(f.path), (cats.get(catOf(f.path)) || 0) + 1);
+    const tools = files.length > 8
+      ? `<div class="t-tools"><input id="t-q" placeholder="搜索文件名…" spellcheck="false">${cats.size > 1 ? `<span class="t-chips">${["", ...cats.keys()].map((c) => `<button type="button" class="t-chip${c === "" ? " on" : ""}" data-c="${c}">${c ? categoryLabel(c) : "全部"} ${c ? cats.get(c) : files.length}</button>`).join("")}</span>` : ""}</div>`
+      : "";
+    $("t-files").innerHTML = tools +
+      (many ? `<label class="t-file t-allrow"><input type="checkbox" id="t-all" checked><span>全部文件</span><span class="muted">${bytes(info!.size)}</span></label>` : "") +
+      files.map((f, i) => `<label class="t-file" data-cat="${catOf(f.path)}" data-name="${esc(f.path.toLowerCase())}"><input type="checkbox" data-i="${i}" checked><span title="${esc(f.path)}">${esc(f.path)}</span><span class="muted">${bytes(f.size)}</span></label>`).join("");
+    // What this resource is: size, hash to verify it by, peers found (for a
+    // magnet), and where it came from.
+    const src = magnet ? inc.url : local ? inc.url.split(/[\\/]/).pop()! : host(inc.url);
+    $("t-kv").insertAdjacentHTML("afterbegin", `
+      <span class="k">资源</span><span class="v"><span>${files.length} 个文件 · ${bytes(info!.size)}</span></span>
+      <span class="k">哈希</span><span class="v"><span title="${info!.hash}">${info!.hash.slice(0, 16)}…</span><button class="btn sm" id="t-copy">复制</button></span>
+      ${magnet ? `<span class="k">节点</span><span class="v"><span>已发现 ${info!.peers} 个</span></span>` : ""}
+      <span class="k">来源</span><span class="v"><span title="${esc(inc.url)}">${esc(src)}</span></span>`);
+    $("t-copy").onclick = async (e) => { await navigator.clipboard.writeText(info!.hash).catch(() => {}); (e.currentTarget as HTMLElement).textContent = "已复制"; };
+    $("t-q")?.addEventListener("input", () => { query = ($("t-q") as HTMLInputElement).value.trim().toLowerCase(); filterRows(); });
+    view.querySelectorAll(".t-chip").forEach((el) => el.addEventListener("click", () => {
+      chip = (el as HTMLElement).dataset.c || "";
+      view.querySelectorAll(".t-chip").forEach((c) => c.classList.toggle("on", c === el));
+      filterRows();
+    }));
     update();
     $("c-start").focus();
   };
@@ -282,7 +313,7 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
     if (!sel.length) return;
     const files = sel.length === info.files.length ? [] : sel;
     const size = sel.reduce((a, i) => a + info!.files[i].size, 0);
-    const id = await addDownload({ url: inc.url, filename: info.name, dir, headers, start, window: win?.label, size, torrentFiles: files });
+    const id = await addDownload({ url: inc.url, filename: $("c-name").value.trim() || info.name, dir, headers, start, window: win?.label, size, torrentFiles: files });
     if (id == null) return;
     invoke("forget_confirm", { token });
     if (!start) { $("w-close").click(); return; }
@@ -291,6 +322,7 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
   };
   $("c-later").onclick = () => add(false);
   $("c-start").onclick = () => add(true);
+  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && !$("c-start").disabled && !(e.target as HTMLElement & HTMLInputElement).matches("select, input")) { e.preventDefault(); $("c-start").click(); } });
 }
 
 // ---------- progress / complete ----------

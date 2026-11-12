@@ -10,7 +10,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, Session, SessionOptions};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use baadash_engine::header::HeaderMap;
@@ -73,6 +73,38 @@ pub struct TorrentInfo {
     pub name: String,
     pub files: Vec<TorrentFile>,
     pub size: u64,
+    /// Info hash (hex), so the user can verify the resource.
+    pub hash: String,
+    /// Peers that answered the probe; the download starts with them.
+    pub peers: usize,
+}
+
+/// A probe's result, kept briefly: starting the download then adds the
+/// torrent from the bytes already fetched and the peers already found,
+/// instead of asking the swarm for the metadata a second time.
+struct Probed {
+    bytes: Vec<u8>,
+    peers: Vec<std::net::SocketAddr>,
+    at: std::time::Instant,
+}
+static PROBED: Mutex<Vec<(String, Probed)>> = Mutex::new(Vec::new());
+const PROBED_TTL: Duration = Duration::from_secs(15 * 60);
+
+fn keep_probed(url: &str, bytes: &[u8], peers: Vec<std::net::SocketAddr>) {
+    let mut g = PROBED.lock().unwrap();
+    g.retain(|(_, p)| p.at.elapsed() < PROBED_TTL);
+    g.retain(|(u, _)| u != url);
+    if g.len() >= 8 {
+        g.remove(0);
+    }
+    g.push((url.to_string(), Probed { bytes: bytes.to_vec(), peers, at: std::time::Instant::now() }));
+}
+
+fn take_probed(url: &str) -> Option<Probed> {
+    let mut g = PROBED.lock().unwrap();
+    g.retain(|(_, p)| p.at.elapsed() < PROBED_TTL);
+    let i = g.iter().position(|(u, _)| u == url)?;
+    Some(g.remove(i).1)
 }
 
 /// Reads a torrent's name and files without downloading it. For a magnet
@@ -97,7 +129,8 @@ pub async fn probe(client: &Client, url: &str, headers: &HeaderMap, cancel: Canc
         .map(|f| TorrentFile { path: f.filename.to_pathbuf().to_string_lossy().replace('\\', "/"), size: f.len })
         .collect();
     let size = files.iter().map(|f| f.size).sum();
-    Ok(TorrentInfo { name, files, size })
+    keep_probed(url.trim(), &list.torrent_bytes, list.seen_peers.clone());
+    Ok(TorrentInfo { name, files, size, hash: list.info_hash.as_string(), peers: list.seen_peers.len() })
 }
 
 /// What happens after a torrent finishes (Settings > General).
@@ -141,12 +174,23 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
     set_note(Some(if job.url.starts_with("magnet:") { "Finding peers".into() } else { "Starting".into() }));
     let session = session().await?;
     std::fs::create_dir_all(&job.dir)?;
-    let add = source(client, &job.url, &job.headers).await?;
+    // The New download window already probed this torrent: reuse its bytes
+    // and the peers that answered, skipping a second swarm lookup. Trackers
+    // inside magnet links are traded for these known-live peers and DHT.
+    let probed = take_probed(job.url.trim());
+    let (add, initial_peers) = match probed {
+        Some(p) => {
+            set_note(Some("Starting".into()));
+            (AddTorrent::from_bytes(p.bytes), (!p.peers.is_empty()).then_some(p.peers))
+        }
+        None => (source(client, &job.url, &job.headers).await?, None),
+    };
     let opts = AddTorrentOptions {
         output_folder: Some(job.dir.to_string_lossy().into_owned()),
         only_files: (!job.files.is_empty()).then(|| job.files.clone()),
         overwrite: true, // lets a paused torrent pick up the pieces already on disk
         ratelimits: librqbit::limits::LimitsConfig { upload_bps: None, download_bps: job.limit_bps },
+        initial_peers,
         ..Default::default()
     };
     let handle = tokio::select! {

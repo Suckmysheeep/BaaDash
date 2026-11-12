@@ -29,20 +29,16 @@
     <main class="document">
       <div class="eyebrow">CHANGELOG</div>
       <h1>每一次更新，都有记录。</h1>
-      <p class="lede">v0.5.1 · 2026-11-13</p>
+      <p class="lede">v0.5.2 · 2026-11-13</p>
       <section class="section">
         <h2>修复与交互</h2>
         <ul>
-        <li>macOS 窗口恢复圆角与原生阴影：无边框窗口此前在 macOS 上是纯直角矩形；现通过窗口内容层实现 12pt 圆角，最大化时回退直角，主窗口与下载小窗口一致生效。</li>
-        <li>设置页「软件更新」发现新版本时直接提供「安装并重启」，不再提示关闭设置后查看；主列表更新卡片与设置页共用同一安装入口与下载状态。</li>
-        <li>macOS 支持应用内更新：应用内下载 dmg、挂载并在退出后自动替换应用包、随后启动新版；没有应用目录写入权限时明确提示改为手动安装。Windows 流程不变，Linux 仍打开发布页。</li>
-        <li>扩展对缺失的浏览器 API 做能力检测：在不支持 downloads／webRequest 的浏览器（如 Safari）中加载不再整体报错，对应功能静默关闭。</li>
+        <li>修复打开设置页时，顶部标题旁仍显示任务数量的问题。</li>
+        <li>界面缩放拖动条改为拖动中只更新数值、松开后才应用缩放：此前拖动时整个界面实时缩放，滑块在指针下漂移、难以拖准。</li>
+        <li>磁力／种子启动提速：新建窗口探测到的种子数据与已应答节点会短暂缓存，点击「开始下载」直接复用——磁力链接不再向节点做第二次元数据查询，跳过重复的「正在寻找节点」等待。</li>
+        <li>新建种子窗口专业化：任务名称可修改；显示文件数与总大小、资源哈希（一键复制）、磁力链接已发现的节点数与完整来源；文件多于 8 个时提供文件名搜索，涉及多种类型时提供类型筛选；回车可直接开始下载。</li>
         </ul>
-        <h2>说明</h2>
-        <ul>
-        <li>评估后暂不提供 Safari 扩展：Safari 至今不支持 downloads API，「接管浏览器下载」这一核心功能无法实现；README 已补充完整评估与前提条件。</li>
-        </ul>
-        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.1">查看此版本 ↗</a>
+        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.2">查看此版本 ↗</a>
         <a class="button" href="https://github.com/Suckmysheeep/BaaDash/blob/main/CHANGELOG.md">完整历史记录 ↗</a></p>
       </section>
     </main>

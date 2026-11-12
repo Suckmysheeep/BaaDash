@@ -466,6 +466,8 @@ declare global {
       return {
         name: "Blender Open Movies Collection",
         size: 9.4 * GB,
+        hash: "dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c",
+        peers: 37,
         files: [
           { path: "Big Buck Bunny/big_buck_bunny_1080p.mp4", size: 3.1 * GB },
           { path: "Big Buck Bunny/subtitles/en.srt", size: 42 * 1024 },

@@ -6,6 +6,15 @@ BaaDash 的重要变更记录于此。格式参考 [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-13
+
+### 修复与交互
+
+- 修复打开设置页时，顶部标题旁仍显示任务数量的问题。
+- 界面缩放拖动条改为拖动中只更新数值、松开后才应用缩放：此前拖动时整个界面实时缩放，滑块在指针下漂移、难以拖准。
+- 磁力／种子启动提速：新建窗口探测到的种子数据与已应答节点会短暂缓存，点击「开始下载」直接复用——磁力链接不再向节点做第二次元数据查询，跳过重复的「正在寻找节点」等待。
+- 新建种子窗口专业化：任务名称可修改；显示文件数与总大小、资源哈希（一键复制）、磁力链接已发现的节点数与完整来源；文件多于 8 个时提供文件名搜索，涉及多种类型时提供类型筛选；回车可直接开始下载。
+
 ## [0.5.1] - 2026-11-13
 
 ### 修复与交互
@@ -177,7 +186,8 @@ BaaDash 的首个正式版本，以新的项目身份发布，承接此前中文
 - 分享文本功能只提取普通链接，不增加站点专用解析，不绕过登录、会员、DRM 或网站访问限制。
 - 多连接不能突破实际带宽，速度取决于服务器、网络与磁盘；续传取决于服务器是否支持及文件是否变更。
 
-[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.2
 [0.5.1]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.0
 [0.4.1]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.4.1

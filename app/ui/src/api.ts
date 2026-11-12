@@ -121,6 +121,8 @@ export interface TorrentInfo {
   name: string;
   size: number;
   files: { path: string; size: number }[];
+  hash: string;
+  peers: number;
 }
 export interface AddRequest {
   checksum?: string | null;

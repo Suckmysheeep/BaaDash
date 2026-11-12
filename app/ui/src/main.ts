@@ -392,7 +392,7 @@ function renderHeader(list: Item[]) {
   $("h-icon").innerHTML = v ? icon(v.icon) : typeIcon(state.view);
   $("h-icon").style.color = viewTint();
   $("h-name").textContent = $("dlg-settings").open ? "设置" : v ? v.name : categoryLabel(state.view);
-  $("h-count").textContent = list.length ? String(list.length) : "";
+  $("h-count").textContent = $("dlg-settings").open ? "" : list.length ? String(list.length) : "";
   $("btn-pause-all").hidden = !p.pauseAll || !list.some(isActive);
   $("btn-resume-all").hidden = !p.resumeAll || !list.some(
     (i) => i.status === "paused" || i.status === "error",
@@ -2259,7 +2259,12 @@ window.addEventListener("focus", async () => {
   if (text && text !== lastClipboard && extractLinks(text).length) { lastClipboard = text; openBatch(text); }
 });
 
-$("set-scale").addEventListener("input", () => { $("set-scale").style.setProperty("--range-progress", ((Number($("set-scale").value)-90)/60*100)+"%"); $("scale-value").textContent = $("set-scale").value + "%"; document.documentElement.style.zoom = String(Math.min(150, Math.max(90, Number($("set-scale").value) || 100))/100); });
+// Live-zooming the document while the slider itself is being dragged makes
+// the thumb drift away from the pointer: update the label on input, apply
+// the zoom on release, like a display-settings dialog.
+const applyScale = () => { document.documentElement.style.zoom = String(Math.min(150, Math.max(90, Number($("set-scale").value) || 100))/100); };
+$("set-scale").addEventListener("input", () => { $("set-scale").style.setProperty("--range-progress", ((Number($("set-scale").value)-90)/60*100)+"%"); $("scale-value").textContent = $("set-scale").value + "%"; });
+$("set-scale").addEventListener("change", applyScale);
 $("dlg-settings").addEventListener("close", () => { document.documentElement.style.zoom = String((settings().interfaceScale || 100)/100); });
 
 $("set-proxy-mode").addEventListener("change", () => { $("proxy-fields").hidden = $("set-proxy-mode").value !== "manual"; });
