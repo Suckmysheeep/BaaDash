@@ -276,11 +276,14 @@ pub async fn check_update(m: Mgr<'_>) -> Result<Option<crate::update::Update>, S
     })
 }
 
-/// Installs a release: on Windows downloads and runs the installer, then quits
-/// so it can replace this app; elsewhere opens the download in the browser.
+/// Installs a release: on Windows downloads and runs the installer, on macOS
+/// replaces the app bundle from the downloaded image; both then quit so the
+/// update can take over and restart the app. Elsewhere opens the download in
+/// the browser.
 #[tauri::command]
 pub async fn install_update(m: Mgr<'_>, url: String) -> Result<(), String> {
-    if cfg!(windows) && url.ends_with(".exe") {
+    let in_place = (cfg!(windows) && url.ends_with(".exe")) || (cfg!(target_os = "macos") && url.ends_with(".dmg"));
+    if in_place {
         crate::update::run_installer(m.client(), &url).await.map_err(|e| {
             crate::log::line(&format!("update install failed: {e:#}"));
             format!("{e:#}")

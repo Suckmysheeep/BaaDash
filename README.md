@@ -139,6 +139,16 @@ Firefox 需要 140 及以上版本（扩展使用 `data_collection_permissions` 
 | Chromium 系 | `baadash-extension.zip` | 加载已解压的扩展程序 |
 | Firefox | `baadash-firefox.xpi` | `about:debugging` 临时载入 |
 
+### Safari
+
+暂不支持，原因与进展如实说明：
+
+- **「接管浏览器下载」在 Safari 上无法实现**：Safari Web Extension 至今不支持 `downloads` API（MDN 兼容性数据全部为「不支持」），扩展无法感知和接管浏览器自己的下载，这是本扩展的核心功能。
+- 其余基础在 macOS 15+ 的 Safari 18+ 上基本可用：非阻塞 `webRequest`（媒体嗅探）、`storage.session`、右键菜单、内容脚本浮层。扩展自 v0.5.1 起对缺失 API 做了能力检测，在 Safari 中加载不会整体崩溃，但接管下载不可用，只能算半成品。
+- Safari 扩展还必须打包进 macOS 应用（`.appex`），经 Xcode 转换并用 Apple 开发者账号（99 美元/年）签名、公证后才能分发，构建链路也需要一台 Mac。
+
+如果未来 Safari 补上 `downloads` API，或本项目拥有了签名与 Mac 构建条件，会重新评估完整支持。
+
 原生消息主机按扩展 ID 白名单校验（Chromium 为 `knmfjbmojepkdiflnckpfjimfmjfcbgh`，Firefox 为 `baadash@baadash.app`），换用其他来源的扩展不会被识别。扩展必须配合桌面应用使用；只看到按钮不代表已成功接管下载。
 
 ## 界面预览

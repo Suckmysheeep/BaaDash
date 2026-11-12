@@ -6,6 +6,19 @@ BaaDash 的重要变更记录于此。格式参考 [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-13
+
+### 修复与交互
+
+- macOS 窗口恢复圆角与原生阴影：无边框窗口此前在 macOS 上是纯直角矩形；现通过窗口内容层实现 12pt 圆角，最大化时回退直角，主窗口与下载小窗口一致生效。
+- 设置页「软件更新」发现新版本时直接提供「安装并重启」，不再提示关闭设置后查看；主列表更新卡片与设置页共用同一安装入口与下载状态。
+- macOS 支持应用内更新：应用内下载 dmg、挂载并在退出后自动替换应用包、随后启动新版；没有应用目录写入权限时明确提示改为手动安装。Windows 流程不变，Linux 仍打开发布页。
+- 扩展对缺失的浏览器 API 做能力检测：在不支持 downloads／webRequest 的浏览器（如 Safari）中加载不再整体报错，对应功能静默关闭。
+
+### 说明
+
+- 评估后暂不提供 Safari 扩展：Safari 至今不支持 downloads API，「接管浏览器下载」这一核心功能无法实现；README 已补充完整评估与前提条件。
+
 ## [0.5.0] - 2026-11-12
 
 ### 功能
@@ -164,7 +177,8 @@ BaaDash 的首个正式版本，以新的项目身份发布，承接此前中文
 - 分享文本功能只提取普通链接，不增加站点专用解析，不绕过登录、会员、DRM 或网站访问限制。
 - 多连接不能突破实际带宽，速度取决于服务器、网络与磁盘；续传取决于服务器是否支持及文件是否变更。
 
-[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.0
 [0.4.1]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.4.0

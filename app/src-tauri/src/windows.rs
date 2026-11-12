@@ -11,8 +11,39 @@ pub fn polish(window: &WebviewWindow) {
         // Avoid a rectangular compositor shadow around the clipped region.
         unsafe { native_shape(hwnd.0, window.is_maximized().unwrap_or(false)); }
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    macos_shape(window, window.is_maximized().unwrap_or(false));
+    #[cfg(not(any(windows, target_os = "macos")))]
     let _ = window;
+}
+
+/// A frameless NSWindow is a bare rectangle: round the content layer so the
+/// window looks like every other macOS window, and give it the shadow the
+/// config turns off for Windows' sake.
+#[cfg(target_os = "macos")]
+fn macos_shape(window: &WebviewWindow, maximized: bool) {
+    use objc::runtime::Object;
+    use objc::{msg_send, sel, sel_impl};
+    let Ok(handle) = window.ns_window() else { return };
+    let ns_window = handle as *mut Object;
+    if ns_window.is_null() {
+        return;
+    }
+    let radius: f64 = if maximized { 0.0 } else { 12.0 };
+    unsafe {
+        let _: () = msg_send![ns_window, setHasShadow: true];
+        let content_view: *mut Object = msg_send![ns_window, contentView];
+        if content_view.is_null() {
+            return;
+        }
+        let _: () = msg_send![content_view, setWantsLayer: true];
+        let layer: *mut Object = msg_send![content_view, layer];
+        if layer.is_null() {
+            return;
+        }
+        let _: () = msg_send![layer, setCornerRadius: radius];
+        let _: () = msg_send![layer, setMasksToBounds: true];
+    }
 }
 
 #[cfg(windows)]

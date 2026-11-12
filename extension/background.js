@@ -140,6 +140,9 @@ const markBrowser = (u) => { if (typeof u === "string" && u.includes("#baadash-b
 chrome.tabs.onCreated.addListener((t) => markBrowser(t.pendingUrl || t.url));
 chrome.tabs.onUpdated.addListener((_id, info) => markBrowser(info.url));
 
+// Safari has no downloads API: skip interception there (the rest of the
+// extension still works) instead of crashing the background script.
+if (chrome.downloads?.onCreated)
 chrome.downloads.onCreated.addListener(async (item) => {
   const settings = await getSettings();
   const url = item.finalUrl || item.url;
@@ -202,7 +205,11 @@ function header(headers, name) {
   return headers?.find((h) => h.name.toLowerCase() === name)?.value || "";
 }
 
-chrome.webRequest.onResponseStarted.addListener(
+// Safari's webRequest needs 18+ and drops extraInfoSpec; sniffing simply
+// stays off where the API is missing or rejects the listener options.
+try {
+  if (chrome.webRequest?.onResponseStarted)
+  chrome.webRequest.onResponseStarted.addListener(
   async (d) => {
     if (d.tabId < 0 || d.statusCode >= 400) return;
     const prefs = await getSettings();
@@ -257,6 +264,9 @@ chrome.webRequest.onResponseStarted.addListener(
   },
   ["responseHeaders"],
 );
+} catch {
+  // No media sniffing on this browser.
+}
 
 // ---------- reading a stream's qualities (HLS) ----------
 // The player already loaded this playlist; reading it again takes a moment

@@ -87,9 +87,74 @@ pub async fn run_installer(client: &Client, url: &str) -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(windows))]
+/// Downloads the macOS disk image, mounts it, and replaces this app bundle
+/// through a helper script that waits for the app to quit, then relaunches
+/// the new copy. The image is fetched by the app itself, so it carries no
+/// quarantine attribute and the copied app opens without a Gatekeeper stop.
+#[cfg(target_os = "macos")]
+pub async fn run_installer(client: &Client, url: &str) -> Result<()> {
+    if !url.starts_with("https://github.com/Suckmysheeep/BaaDash/releases/download/") {
+        bail!("refusing to install from {url}");
+    }
+    let bytes = client.get(url).header("User-Agent", "BaaDash").send().await?.error_for_status()?.bytes().await?;
+    let dmg = std::env::temp_dir().join(url.rsplit('/').next().unwrap_or("BaaDash.dmg"));
+    std::fs::write(&dmg, &bytes).with_context(|| format!("could not save {}", dmg.display()))?;
+    let out = std::process::Command::new("hdiutil")
+        .args(["attach", "-nobrowse", "-readonly"])
+        .arg(&dmg)
+        .output()
+        .context("could not mount the downloaded image")?;
+    if !out.status.success() {
+        bail!("无法挂载下载的安装镜像：{}", String::from_utf8_lossy(&out.stderr).trim());
+    }
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let mount = stdout
+        .lines()
+        .filter_map(|l| l.split('\t').next_back().map(str::trim))
+        .find(|s| s.starts_with("/Volumes/"))
+        .context("无法识别安装镜像的挂载点")?
+        .to_string();
+    let source = std::fs::read_dir(&mount)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .find(|p| p.extension().is_some_and(|e| e == "app"))
+        .context("安装镜像中没有找到应用")?;
+    // The running bundle, e.g. /Applications/BaaDash.app from
+    // /Applications/BaaDash.app/Contents/MacOS/baadash.
+    let exe = std::env::current_exe()?;
+    let bundle = exe
+        .ancestors()
+        .find(|p| p.extension().is_some_and(|e| e == "app"))
+        .context("当前并非从应用包运行，无法原地更新")?
+        .to_path_buf();
+    // Fail early rather than from the detached script.
+    let probe = bundle.with_extension("write-test");
+    std::fs::write(&probe, b"").context("没有写入应用所在目录的权限，请从页面手动安装")?;
+    let _ = std::fs::remove_file(&probe);
+    let script = std::env::temp_dir().join("baadash-update.sh");
+    std::fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\nwhile kill -0 {} 2>/dev/null; do sleep 0.2; done\nditto \"{}\" \"{}\"\nhdiutil detach \"{}\" -quiet\nopen \"{}\"\n",
+            std::process::id(),
+            source.display(),
+            bundle.display(),
+            mount,
+            bundle.display(),
+        ),
+    )?;
+    std::process::Command::new("/bin/sh")
+        .arg(&script)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .context("could not start the install helper")?;
+    Ok(())
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 pub async fn run_installer(_client: &Client, _url: &str) -> Result<()> {
-    bail!("installing in place is only supported on Windows")
+    bail!("installing in place is only supported on Windows and macOS")
 }
 
 #[cfg(test)]

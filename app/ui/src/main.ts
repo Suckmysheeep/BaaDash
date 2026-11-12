@@ -2027,23 +2027,51 @@ function sampleSpeeds(){
 // Updates: check a few seconds after start, then twice a day. A dismissed
 // version stays quiet; the next one shows again.
 let update: UpdateInfo | null = null;
+let updateBusy = false;
 const SKIP_KEY = "baadash.skipUpdate";
+const installLabel = (u: UpdateInfo) =>
+  u.asset
+    ? u.asset.endsWith(".exe") || u.asset.endsWith(".dmg")
+      ? "安装并重启"
+      : "下载更新"
+    : "获取更新";
 function renderUpdate(busy = false) {
   const card = $("update");
   let skipped = "";
   try {
     skipped = localStorage.getItem(SKIP_KEY) || "";
   } catch {}
-  card.hidden = !update || update.version === skipped;
+  const pending = !!update && update.version !== skipped;
+  // The settings row offers the same install, so the update is actionable
+  // without closing the settings page.
+  const btn = $("update-install") as HTMLButtonElement;
+  btn.hidden = !pending;
+  if (pending && update) {
+    btn.disabled = busy;
+    btn.textContent = busy ? "正在下载更新…" : installLabel(update);
+    $("update-status").textContent = `发现新版本 v${update.version}`;
+  }
+  card.hidden = !pending;
   if (card.hidden || !update) return;
-  const install = update.asset
-    ? update.asset.endsWith(".exe")
-      ? "安装并重启"
-      : "下载更新"
-    : "获取更新";
+  const install = installLabel(update);
   card.innerHTML = `<span class="ob-icon">${icon("download")}</span>
     <span class="ob-text"><b>BaaDash ${esc(update.version)} 已发布</b>${busy ? "正在下载更新…" : "当前版本 " + esc(state.version)}</span>
     <span class="ob-actions">${busy ? "" : `<button class="link-btn" data-notes>更新内容</button><button class="link-btn" data-install>${install}</button><button class="sq-btn" data-skip title="跳过此版本">${icon("x")}</button>`}</span>`;
+}
+// Windows and macOS install in place: the app quits once the installer takes
+// over. Anything else opens the release page in the browser.
+async function installUpdate() {
+  if (!update || updateBusy) return;
+  updateBusy = true;
+  renderUpdate(true);
+  try {
+    await invoke("install_update", { url: update.asset || update.page });
+  } catch (err) {
+    toast(`更新失败：${displayText(err)}`);
+  } finally {
+    updateBusy = false;
+    renderUpdate();
+  }
 }
 async function checkUpdate(manual = false) {
   if (manual) {
@@ -2054,9 +2082,7 @@ async function checkUpdate(manual = false) {
     update = await invoke("check_update");
     if (manual) {
       localStorage.removeItem(SKIP_KEY);
-      $("update-status").textContent = update
-        ? `发现新版本 ${update.version}，关闭设置后可查看更新说明`
-        : "已是当前更新渠道的最新版本";
+      if (!update) $("update-status").textContent = "已是当前更新渠道的最新版本";
     }
     renderUpdate();
   } catch (e) {
@@ -2066,6 +2092,7 @@ async function checkUpdate(manual = false) {
   }
 }
 $("check-update").onclick = () => checkUpdate(true);
+$("update-install").onclick = () => installUpdate();
 $("update").addEventListener("click", async (e) => {
   const b = (e.target as HTMLElement).closest("button");
   if (!b || !update) return;
@@ -2075,16 +2102,7 @@ $("update").addEventListener("click", async (e) => {
       localStorage.setItem(SKIP_KEY, update.version);
     } catch {}
     renderUpdate();
-  } else if (b.hasAttribute("data-install")) {
-    renderUpdate(true);
-    try {
-      await invoke("install_update", { url: update.asset || update.page });
-      renderUpdate();
-    } catch (err) {
-      renderUpdate();
-      toast(`更新失败：${displayText(err)}`);
-    }
-  }
+  } else if (b.hasAttribute("data-install")) installUpdate();
 });
 async function boot() {
   hydrate();

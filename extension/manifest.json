@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BaaDash 下载助手",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "多连接下载与断点续传，支持图片和 Pixiv 当前作品一键下载、视频下载及本地另存 GIF。",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv7cQHJNI1Ib1uldwt9Lu3KiQRdmEQAXUeyR790YkmUDXyCDlU7kO9LNaBJGGdvZsZ1WUwyszhyK1DHwmUj3XSONJBfo6V8B6bz/RcV+wNEQXWrzRqPszIxUJs/r7IXH0aUMyF0cRyKUO2+LJ+YEdwrGx/LyoFYb8DgUNGsDLgUXTHBVUQyrXKRoJhK45xPVXq9DELiJXDandfFcB5xRFET8uYdmmZSZFEAi6l3NbnOHMLULdoUoyI9JMVINaHUdnMmXxDZd6ZaCht5OgqcwRYdEGgai+9M73b5PHQYds4ey5h1NBHYkBNbMjFSG7/FH9v1sNXmmBO+bwBLZYRqUS6wIDAQAB",
   "permissions": [
