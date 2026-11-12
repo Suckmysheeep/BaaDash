@@ -445,7 +445,7 @@ dependencies = [
 
 [[package]]
 name = "baadash-app"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "aes",
  "anyhow",
@@ -473,7 +473,7 @@ dependencies = [
 
 [[package]]
 name = "baadash-cli"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "baadash-engine",
@@ -485,7 +485,7 @@ dependencies = [
 
 [[package]]
 name = "baadash-engine"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "futures-util",

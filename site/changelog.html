@@ -29,35 +29,17 @@
     <main class="document">
       <div class="eyebrow">CHANGELOG</div>
       <h1>每一次更新，都有记录。</h1>
-      <p class="lede">v0.4.0 · 2026-11-12</p>
+      <p class="lede">v0.4.1 · 2026-11-12</p>
       <section class="section">
-        <h2>界面重构</h2>
-        <ul>
-        <li>采用石墨黑与中性灰阶、品牌荧光绿，保留羊头图标，应用名称使用字体排版。</li>
-        <li>重做紧凑任务工作区与专业数据表，直接展示大小、进度、速度、剩余时间和连接数，完整保留七类文件分类。</li>
-        <li>主界面恢复真实网速曲线与多连接点阵；点阵按各连接的实际分段范围绘制，不填充虚构数据。</li>
-        <li>设置改为应用内页面，左上角返回列表；未保存更改可保存离开、放弃或继续编辑。</li>
-        <li>使用太阳／月亮切换主题，新增紧凑／标准密度和减少动态效果设置；旧用户自选强调色继续保留。</li>
-        <li>窗口圆角由原生窗口管理：Windows 10/11 使用实际窗口区域裁切；独立窗口移除透明阴影边距。</li>
-        <li>保留下载核心、图片/Pixiv/GIF 独立记录、媒体与种子下载、浏览器集成、续传和校验能力。</li>
-        </ul>
         <h2>修复与交互</h2>
         <ul>
-        <li>下载确认与进度弹窗按内容自动调整窗口高度，展开高级选项时整窗长高，不再出现内部滚动条。</li>
-        <li>修复无边框窗口拖动与边缘缩放逻辑，外部圆角与内部视图统一。</li>
-        <li>重做窗口缩放适配：拉到最小高度不出现滚动条，最大化时表格与面板填满可用空间。</li>
-        <li>没有下载任务进行时自动收起实时网速曲线与多连接点阵，任务恢复后展开。</li>
-        <li>修复已下载／大小列的对齐与单位显示。</li>
+        <li>磁力链接查询种子信息全程可控：会话初始化与元数据查询均设超时，关闭或取消新建下载窗口会真正中止后台节点查询，不再留下挂起的探测。</li>
+        <li>磁力等待界面显示已等待秒数，节点较少时给出提示；查询失败提供中文错误与「重试」，可随时取消。</li>
+        <li>修复「保存设置更改？」弹窗内容贴边、标题间距异常的问题，内边距与其余确认弹窗统一。</li>
+        <li>任务列表为空时不再显示「多选」按钮；视图切换导致列表变空时自动退出多选。</li>
+        <li>全部任务／下载队列／已完成／下载失败与文件分类视图按各自语义定制空状态文案、图标与工具栏：已完成提供「打开所选文件夹」（仅单选时可用，不会批量打开）与清理历史，下载失败的主操作为全部重试。</li>
         </ul>
-        <h2>工程与发布</h2>
-        <ul>
-        <li>工程层统一改名：crate 与可执行文件 <code>baadash</code>、应用标识 <code>com.baadash.app</code>、原生消息主机 <code>com.baadash.host</code>、Firefox 扩展 ID <code>baadash@baadash.app</code>；Chromium 扩展密钥保留，扩展 ID 不变。</li>
-        <li>首启动自动迁移：旧 <code>com.swiftdl.app</code> 数据目录（设置、历史、缓存与 WebView 配置）整体迁入新标识目录，旧原生消息主机与种子/磁力注册一并清理；旧版续传文件（<code>.swiftdl</code>）仍可恢复。</li>
-        <li>扩展发行包改名 <code>baadash-extension.zip</code> 与 <code>baadash-firefox.xpi</code>，安装包沿用 <code>BaaDash_*</code> 命名。</li>
-        <li>仓库精简：宣传视频、品牌设计素材、商店上架材料与 agent 过程文档移出开源仓库（本地归档）；保留官网、界面截图重拍与交互测试工具链。</li>
-        <li>README 与官网演示图统一为深色主题，窗口截图内置 12px 圆角，与官网展示一致。</li>
-        </ul>
-        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.4.0">查看此版本 ↗</a>
+        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.4.1">查看此版本 ↗</a>
         <a class="button" href="https://github.com/Suckmysheeep/BaaDash/blob/main/CHANGELOG.md">完整历史记录 ↗</a></p>
       </section>
     </main>

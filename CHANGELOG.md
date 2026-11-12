@@ -6,6 +6,8 @@ BaaDash 的重要变更记录于此。格式参考 [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-12
+
 ### 修复与交互
 
 - 磁力链接查询种子信息全程可控：会话初始化与元数据查询均设超时，关闭或取消新建下载窗口会真正中止后台节点查询，不再留下挂起的探测。
@@ -144,7 +146,8 @@ BaaDash 的首个正式版本，以新的项目身份发布，承接此前中文
 - 分享文本功能只提取普通链接，不增加站点专用解析，不绕过登录、会员、DRM 或网站访问限制。
 - 多连接不能突破实际带宽，速度取决于服务器、网络与磁盘；续传取决于服务器是否支持及文件是否变更。
 
-[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.4.0
 [0.3.1]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.3.0

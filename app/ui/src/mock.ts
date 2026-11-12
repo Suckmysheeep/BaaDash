@@ -264,7 +264,7 @@ declare global {
       items: clone(),
       settings: { ...settings },
       pending: [],
-      version: "0.4.0",
+      version: "0.4.1",
     }),
     probe_url: async ({ url }) => {
       if (!VIDEO) await new Promise((r) => setTimeout(r, 700));
