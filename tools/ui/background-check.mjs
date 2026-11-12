@@ -62,16 +62,23 @@ const request = {
     { name: "content-length", value: "10000000" },
   ],
 };
+// Every real storage.sync write fires onChanged; the settings cache relies on
+// it. Mutate the backing store and fire the event, like a browser would.
+const setPrefs = async (obj) => {
+  Object.assign(prefs, obj);
+  const changes = Object.fromEntries(
+    Object.keys(obj).map((k) => [k, { newValue: obj[k] }]),
+  );
+  await listeners.storage(changes, "sync");
+};
 await listeners.response(request);
 assert.equal(session["media:1"], undefined);
-prefs.sniffing = true;
+await setPrefs({ sniffing: true });
 await listeners.response(request);
 assert.equal(session["media:1"].length, 1);
-prefs.sniffing = false;
-await listeners.storage({ sniffing: { newValue: false } }, "sync");
+await setPrefs({ sniffing: false });
 assert.equal(session["media:1"], undefined);
-prefs.sniffing = true;
-prefs.disabledSites = ["example.com"];
+await setPrefs({ sniffing: true, disabledSites: ["example.com"] });
 await listeners.response(request);
 assert.equal(session["media:1"], undefined);
 console.log(
@@ -79,7 +86,7 @@ console.log(
 );
 
 // A normal browser download loses its navigation fragment; remember the marked tab URL.
-prefs.enabled = true;
+await setPrefs({ enabled: true });
 listeners.tabCreated({pendingUrl:"https://files.test/file.zip#baadash-browser"});
 await listeners.download({id:99,url:"https://files.test/file.zip",state:"in_progress"});
 console.log("PASS: browser fallback survives fragment removal without pausing or re-intercepting.");
