@@ -91,6 +91,8 @@ export interface ProbeInfo {
   resumable: boolean;
   category: string;
   dir: string;
+  /** The response is really a torrent even though the link didn't look like one. */
+  torrent: boolean;
 }
 export interface BrowserStatus {
   id: string;

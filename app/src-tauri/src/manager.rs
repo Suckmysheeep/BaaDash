@@ -493,8 +493,17 @@ impl DownloadManager {
         let this = self.clone();
         tauri::async_runtime::spawn(async move {
             let headers = inc.headers();
-            let probed = baadash_engine::probe(&this.client, &inc.url, &to_header_map(&headers)).await.ok().map(|r| r.filename);
-            let filename = inc.suggested_name().or(probed).unwrap_or_else(|| "download.bin".into());
+            let probed = baadash_engine::probe(&this.client, &inc.url, &to_header_map(&headers)).await.ok();
+            // The link said "attach-download-10.htm" but the response is a
+            // torrent: it deserves the torrent window (file picking), not a
+            // silent download of whatever the bytes happen to be.
+            if let Some(r) = &probed {
+                if crate::torrent::is_torrent_response(&r.filename, r.content_type.as_deref()) {
+                    this.new_download_window(Incoming { filename: Some(r.filename.clone()), ..inc });
+                    return;
+                }
+            }
+            let filename = inc.suggested_name().or(probed.map(|r| r.filename)).unwrap_or_else(|| "download.bin".into());
             let dir = this.default_dir(category_for(&filename));
             this.add(AddRequest { checksum: None, url: inc.url, filename, dir, headers, start: true, window: None, format: None, size: None, torrent_files: None, background: false, convert_gif: false, gif_options: None });
         });
@@ -555,6 +564,15 @@ impl DownloadManager {
 
     /// Opens a "New download" window for `inc`.
     pub fn new_download_window(&self, inc: Incoming) {
+        // Clicking the same link five times must not stack five windows:
+        // one already waiting for this exact URL just comes to the front.
+        {
+            let g = self.inner.lock().unwrap();
+            if let Some(token) = g.confirms.iter().find(|(_, i)| i.url == inc.url).map(|(t, _)| *t) {
+                let _ = crate::windows::open(&self.app, &format!("new-{token}"), "", "New download");
+                return;
+            }
+        }
         let token = {
             let mut g = self.inner.lock().unwrap();
             let token = g.next_confirm;
@@ -562,6 +580,7 @@ impl DownloadManager {
             g.confirms.insert(token, inc);
             token
         };
+        crate::log::line(&format!("opening New download window (token {token})"));
         if let Err(e) = crate::windows::open(&self.app, &format!("new-{token}"), &format!("confirm={token}"), "New download") {
             crate::log::line(&format!("could not open the New download window: {e:#}"));
         }
@@ -580,6 +599,7 @@ impl DownloadManager {
         let mut g = self.inner.lock().unwrap();
         g.confirms.remove(&token);
         if let Some(c) = g.probe_cancels.remove(&token) {
+            crate::log::line(&format!("New download window {token} closed during a probe; cancelling it"));
             c.cancel();
         }
     }

@@ -96,6 +96,9 @@ async function confirmView(token: number) {
 
   try {
     info = await invoke("probe_url", { url: inc.url, headers });
+    // The link lied about being a web page ("attach-download-10.htm"): the
+    // response says it is really a torrent — show the torrent view instead.
+    if (info.torrent) return torrentView(token, inc, settings, headers);
     const suggested = /\.[a-z0-9]{2,5}$/i.test(inc.filename || "") ? inc.filename!.split(/[\\/]/).pop() : "";
     $("c-name").value = suggested || info.filename;
     $("c-cat").value = info.category;
@@ -238,6 +241,10 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
     </div>`;
   const setDir = (d: string) => { dir = d; $("c-dir").textContent = d; $("c-dir").title = d; };
   setDir(dir);
+  // A magnet's dn= parameter already names the resource: show it while the
+  // swarm is still being asked for the real metadata.
+  const dn = magnet ? new URLSearchParams(inc.url.slice(inc.url.indexOf("?"))).get("dn") : null;
+  if (dn) $("c-name").value = dn;
   const chosen = (): number[] => [...view.querySelectorAll<HTMLInputElement>(".t-file input[data-i]:checked")].map((c) => Number(c.dataset.i));
   const update = () => {
     const sel = chosen(), size = sel.reduce((a, i) => a + info!.files[i].size, 0);
@@ -290,11 +297,26 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
     $("t-files").innerHTML = `<div class="t-wait"><span class="spinner"></span><span class="muted" id="t-wait-msg">${waitMsg()}</span></div>`;
     clearInterval(timer);
     timer = window.setInterval(() => { elapsed++; const m = $("t-wait-msg"); if (m) m.textContent = waitMsg(); }, 1000);
+    // The backend gives up on its own after 90 s; if even that answer never
+    // arrives (a stalled engine must never turn this window into a trap),
+    // recover locally so cancel and retry keep working.
+    let settled = false;
+    const watchdog = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      clearInterval(timer);
+      $("t-files").innerHTML = `<div class="t-wait"><span class="err">下载引擎没有回应。请重试；若反复出现，重启 BaaDash 后查看日志（设置 → 关于）。</span><button class="btn sm" id="t-retry">重试</button></div>`;
+      $("t-retry").onclick = () => void probe();
+    }, 105_000);
     try {
       info = await invoke("probe_torrent", { url: inc.url, headers, token });
+      settled = true;
+      clearTimeout(watchdog);
       clearInterval(timer);
       fill();
     } catch (e) {
+      settled = true;
+      clearTimeout(watchdog);
       clearInterval(timer);
       $("t-files").innerHTML = `<div class="t-wait"><span class="err">${esc(displayText(e))}</span><button class="btn sm" id="t-retry">重试</button></div>`;
       $("t-retry").onclick = () => void probe();

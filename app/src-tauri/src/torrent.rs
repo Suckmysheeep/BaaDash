@@ -7,7 +7,7 @@
 //! the computer's handler for magnet links and .torrent files.
 
 use anyhow::{Context, Result, anyhow, bail};
-use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, Session, SessionOptions};
+use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, DhtSessionConfig, Session, SessionOptions};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -24,17 +24,55 @@ pub fn is_torrent(url: &str, filename: Option<&str>) -> bool {
     url.starts_with("magnet:") || path.ends_with(".torrent") || filename.is_some_and(|f| f.to_ascii_lowercase().ends_with(".torrent"))
 }
 
+/// A probed response that is really a torrent, whatever the link looked like:
+/// some sites hand torrents out under names like "attach-download-10.htm" and
+/// only the response (its filename or Content-Type) gives them away.
+pub fn is_torrent_response(filename: &str, content_type: Option<&str>) -> bool {
+    filename.to_ascii_lowercase().ends_with(".torrent")
+        || content_type.is_some_and(|c| c == "application/x-bittorrent" || c == "application/octet-stream+torrent")
+}
+
+/// The tracker addresses embedded in a magnet link (its `tr=` parameters).
+fn magnet_trackers(url: &str) -> Option<Vec<String>> {
+    let query = url.trim().strip_prefix("magnet:")?.split(['?', '#']).nth(1)?;
+    let trackers: Vec<String> = url::form_urlencoded::parse(query.as_bytes())
+        .filter(|(k, _)| k == "tr")
+        .map(|(_, v)| v.into_owned())
+        .filter(|v| !v.is_empty())
+        .collect();
+    (!trackers.is_empty()).then_some(trackers)
+}
+
 /// One BitTorrent session for the whole app, started on first use.
 static SESSION: OnceCell<Arc<Session>> = OnceCell::const_new();
+
+/// DHT bootstrap nodes. librqbit's built-in list is only two of these, and
+/// both are unreachable from some networks (DNS poisoning, UDP filtering),
+/// which leaves magnets unfindable; asking a wider set gets in far more often.
+const BOOTSTRAP: [&str; 5] = [
+    "router.bittorrent.com:6881",
+    "router.utorrent.com:6881",
+    "dht.transmissionbt.com:6881",
+    "dht.libtorrent.org:25401",
+    "dht.aelitis.com:6881",
+];
 
 async fn session() -> Result<Arc<Session>> {
     SESSION
         .get_or_try_init(|| async {
             let dir = crate::browser::data_dir().join("torrents");
             std::fs::create_dir_all(&dir)?;
-            tokio::time::timeout(Duration::from_secs(30), Session::new_with_opts(dir, SessionOptions::default()))
+            let dht = DhtSessionConfig {
+                bootstrap_addrs: Some(BOOTSTRAP.iter().map(|s| s.to_string()).collect()),
+                ..Default::default()
+            };
+            let opts = SessionOptions { dht: Some(dht), ..Default::default() };
+            let started = std::time::Instant::now();
+            let session = tokio::time::timeout(Duration::from_secs(30), Session::new_with_opts(dir, opts))
                 .await
-                .map_err(|_| anyhow!("the torrent engine took too long to start"))?
+                .map_err(|_| anyhow!("the torrent engine took too long to start"))??;
+            crate::log::line(&format!("torrent engine started in {:.1}s", started.elapsed().as_secs_f64()));
+            Ok(session)
         })
         .await
         .cloned()
@@ -110,16 +148,27 @@ fn take_probed(url: &str) -> Option<Probed> {
 /// Reads a torrent's name and files without downloading it. For a magnet
 /// link this asks peers for the details first, which can take a moment.
 pub async fn probe(client: &Client, url: &str, headers: &HeaderMap, cancel: CancellationToken) -> Result<TorrentInfo> {
+    // Each stage goes to the log: if a probe ever hangs again, the last line
+    // says exactly where it stopped.
+    let short: String = url.trim().chars().take(80).collect();
+    crate::log::line(&format!("torrent probe started: {short}"));
+    let started = std::time::Instant::now();
     let session = tokio::select! {
         s = session() => s?,
-        _ = cancel.cancelled() => bail!("cancelled"),
+        _ = cancel.cancelled() => { crate::log::line("torrent probe cancelled before the engine was up"); bail!("cancelled") }
     };
     let add = source(client, url, headers).await?;
     let opts = AddTorrentOptions { list_only: true, ..Default::default() };
     let resp = tokio::select! {
-        r = tokio::time::timeout(Duration::from_secs(90), session.add_torrent(add, Some(opts))) =>
-            r.map_err(|_| anyhow!("couldn't find anyone sharing this torrent"))??,
-        _ = cancel.cancelled() => bail!("cancelled"),
+        r = tokio::time::timeout(Duration::from_secs(90), session.add_torrent(add, Some(opts))) => {
+            match &r {
+                Ok(Ok(_)) => crate::log::line(&format!("torrent probe found peers in {:.1}s: {short}", started.elapsed().as_secs_f64())),
+                Ok(Err(e)) => crate::log::line(&format!("torrent probe failed in {:.1}s: {e:#}: {short}", started.elapsed().as_secs_f64())),
+                Err(_) => crate::log::line(&format!("torrent probe timed out after 90s: {short}")),
+            }
+            r.map_err(|_| anyhow!("couldn't find anyone sharing this torrent"))??
+        }
+        _ = cancel.cancelled() => { crate::log::line(&format!("torrent probe cancelled after {:.1}s: {short}", started.elapsed().as_secs_f64())); bail!("cancelled") }
     };
     let AddTorrentResponse::ListOnly(list) = resp else { bail!("unexpected answer from the torrent engine") };
     let info = &list.info;
@@ -175,15 +224,16 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
     let session = session().await?;
     std::fs::create_dir_all(&job.dir)?;
     // The New download window already probed this torrent: reuse its bytes
-    // and the peers that answered, skipping a second swarm lookup. Trackers
-    // inside magnet links are traded for these known-live peers and DHT.
+    // and the peers that answered, skipping a second swarm lookup. The bytes
+    // carry no trackers, so the magnet's own `tr=` list goes back in —
+    // on networks where DHT is blocked those trackers are the only peers.
     let probed = take_probed(job.url.trim());
-    let (add, initial_peers) = match probed {
+    let (add, initial_peers, trackers) = match probed {
         Some(p) => {
             set_note(Some("Starting".into()));
-            (AddTorrent::from_bytes(p.bytes), (!p.peers.is_empty()).then_some(p.peers))
+            (AddTorrent::from_bytes(p.bytes), (!p.peers.is_empty()).then_some(p.peers), magnet_trackers(&job.url))
         }
-        None => (source(client, &job.url, &job.headers).await?, None),
+        None => (source(client, &job.url, &job.headers).await?, None, None),
     };
     let opts = AddTorrentOptions {
         output_folder: Some(job.dir.to_string_lossy().into_owned()),
@@ -191,6 +241,7 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
         overwrite: true, // lets a paused torrent pick up the pieces already on disk
         ratelimits: librqbit::limits::LimitsConfig { upload_bps: None, download_bps: job.limit_bps },
         initial_peers,
+        trackers,
         ..Default::default()
     };
     let handle = tokio::select! {
@@ -470,6 +521,24 @@ mod tests {
         let args = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
         assert_eq!(parse_open_arg(&args(&["baadash", "--open", "magnet:?xt=urn:btih:abc"])).unwrap().url, "magnet:?xt=urn:btih:abc");
         assert!(parse_open_arg(&args(&["baadash", "--add", "xyz"])).is_none());
+    }
+
+    #[test]
+    fn sniffs_torrents_from_the_response() {
+        // The "attach-download-10.htm" case: the link name lies, the
+        // Content-Disposition filename or Content-Type tells the truth.
+        assert!(is_torrent_response("attach-download-10.htm", Some("application/x-bittorrent")));
+        assert!(is_torrent_response("film.torrent", Some("application/octet-stream")));
+        assert!(!is_torrent_response("attach-download-10.htm", Some("application/octet-stream")));
+        assert!(!is_torrent_response("page.htm", Some("text/html")));
+    }
+
+    #[test]
+    fn pulls_trackers_out_of_a_magnet() {
+        let m = "magnet:?xt=urn:btih:abc&tr=udp%3A%2F%2Ftracker.one%3A1337%2Fannounce&tr=http://tracker.two/announce&dn=Name";
+        assert_eq!(magnet_trackers(m), Some(vec!["udp://tracker.one:1337/announce".to_string(), "http://tracker.two/announce".to_string()]));
+        assert_eq!(magnet_trackers("magnet:?xt=urn:btih:abc"), None);
+        assert_eq!(magnet_trackers("https://example.com/f.torrent"), None);
     }
 }
 

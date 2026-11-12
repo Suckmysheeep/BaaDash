@@ -27,6 +27,9 @@ pub struct ProbeInfo {
     resumable: bool,
     category: String,
     dir: PathBuf,
+    /// The response says this is really a torrent (its filename or
+    /// Content-Type), even though the link didn't look like one.
+    torrent: bool,
 }
 
 #[tauri::command]
@@ -37,6 +40,7 @@ pub fn get_state(m: Mgr) -> AppState {
 #[tauri::command]
 pub async fn probe_url(m: Mgr<'_>, url: String, headers: Vec<(String, String)>) -> Result<ProbeInfo, String> {
     let remote = baadash_engine::probe(m.client(), url.trim(), &to_header_map(&headers)).await.map_err(|e| format!("{e:#}"))?;
+    let torrent = crate::torrent::is_torrent_response(&remote.filename, remote.content_type.as_deref());
     let category = category_for(&remote.filename).to_string();
     Ok(ProbeInfo {
         dir: m.default_dir(&category),
@@ -44,6 +48,7 @@ pub async fn probe_url(m: Mgr<'_>, url: String, headers: Vec<(String, String)>) 
         size: remote.size,
         resumable: remote.resumable,
         category,
+        torrent,
     })
 }
 

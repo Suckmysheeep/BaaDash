@@ -167,6 +167,17 @@ fn main() {
                     let _ = window.hide();
                 }
             }
+            // Dropping a .torrent file onto any window opens it like a click
+            // on the file would: the New download window, files to pick.
+            tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                let mgr = window.app_handle().state::<Arc<DownloadManager>>();
+                for path in paths {
+                    let dropped = path.to_string_lossy().into_owned();
+                    if torrent::is_torrent(&dropped, None) {
+                        mgr.incoming(manager::Incoming { url: dropped, filename: None, referrer: None, cookies: None, user_agent: None, qualities: None, pick: None, convert_gif: false, gif_options: None });
+                    }
+                }
+            }
             tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. } => {
                 if let Some(webview) = window.app_handle().get_webview_window(window.label()) {
                     windows::polish(&webview);

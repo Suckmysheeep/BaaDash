@@ -13,6 +13,10 @@ pub struct RemoteFile {
     /// True when the server honours `Range` requests and reports a total size.
     pub resumable: bool,
     pub filename: String,
+    /// Lowercased Content-Type (without parameters), when the server sent one.
+    /// Some links (e.g. "attach-download-10.htm") only reveal the real file
+    /// type here.
+    pub content_type: Option<String>,
     pub etag: Option<String>,
     pub last_modified: Option<String>,
 }
@@ -73,10 +77,10 @@ pub async fn probe(client: &Client, url: &str, headers: &header::HeaderMap) -> R
 
     // A web page where a file should be: a sign-in or "are you sure" page.
     // Saving it as the download would only leave a small broken file.
-    let ctype = header_str(h, header::CONTENT_TYPE).unwrap_or("").to_ascii_lowercase();
+    let ctype = header_str(h, header::CONTENT_TYPE).map(|s| s.split(';').next().unwrap_or("").trim().to_ascii_lowercase());
     let attachment = header_str(h, header::CONTENT_DISPOSITION).is_some_and(|d| d.to_ascii_lowercase().contains("attachment"));
     let wants_html = [".html", ".htm", ".xhtml"].iter().any(|e| filename.to_ascii_lowercase().ends_with(e));
-    if ctype.starts_with("text/html") && !attachment && !wants_html {
+    if ctype.as_deref() == Some("text/html") && !attachment && !wants_html {
         bail!("This link opens a web page, not a file. The site may need you to sign in or confirm first.");
     }
 
@@ -85,6 +89,7 @@ pub async fn probe(client: &Client, url: &str, headers: &header::HeaderMap) -> R
         size,
         resumable,
         filename,
+        content_type: ctype.filter(|c| !c.is_empty()),
         etag: header_str(h, header::ETAG).map(str::to_string),
         last_modified: header_str(h, header::LAST_MODIFIED).map(str::to_string),
     })

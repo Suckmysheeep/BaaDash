@@ -148,7 +148,7 @@ pub fn open(app: &AppHandle, label: &str, query: &str, title: &str) -> tauri::Re
             .always_on_top(true)
             .build();
         match built {
-            Ok(w) => { polish(&w); bring_to_front(&w); },
+            Ok(w) => { crate::log::line(&format!("window {label} opened")); polish(&w); bring_to_front(&w); },
             Err(e) => crate::log::line(&format!("could not open window {label}: {e:#}")),
         }
     });

@@ -283,6 +283,7 @@ declare global {
         resumable: true,
         category,
         dir: dirFor(category),
+        torrent: /\.torrent$/i.test(name),
       };
     },
     add_download: ({ req }) => {

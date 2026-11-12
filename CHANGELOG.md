@@ -6,6 +6,22 @@ BaaDash 的重要变更记录于此。格式参考 [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-13
+
+### 修复与交互
+
+- 修复浏览器接管下载时把种子存成网页文件（如 attach-download-10.htm）的问题：不少站点的种子链接以 .htm 结尾、真实类型只写在响应头里。现在探测会依据响应的真实文件名与 Content-Type 识别种子，自动切换为种子视图（可选文件、显示哈希与节点数），不再把网页或种子原样存盘。
+- 新增拖放打开：把 .torrent 文件拖到 BaaDash 任意窗口即打开新建任务窗口，与双击种子文件效果一致。
+- 磁力链接在部分网络下长期找不到节点：DHT 引导节点从引擎内置的 2 个扩展到 5 个（增加 router.bittorrent.com、router.utorrent.com、dht.aelitis.com），在 DNS 污染或 UDP 受限的网络中明显提高磁力解析成功率；复用探测缓存启动下载时，磁力链接自带的 tracker 列表不再丢失。
+- 新建任务窗口增加前端看门狗：即使下载引擎异常无响应，窗口也会在约 105 秒后自行恢复到可重试、可取消的状态——任何情况下窗口都关得掉。
+- 同一链接重复点击不再叠出多个新建任务窗口，已有窗口自动置顶。
+- 磁力链接带有 dn= 名称参数时，探测期间先行显示该名称。
+- 扩展：.torrent 文件不再被「最小文件体积」设置拦截。
+
+### 可观测性
+
+- 磁力探测全程写入日志（开始、引擎就绪耗时、寻点结果／超时／取消），新建窗口的打开与中途取消也有记录：再次遇到异常时，设置 → 关于里的日志能直接指出停在哪一环。
+
 ## [0.5.2] - 2026-11-13
 
 ### 修复与交互
@@ -186,7 +202,8 @@ BaaDash 的首个正式版本，以新的项目身份发布，承接此前中文
 - 分享文本功能只提取普通链接，不增加站点专用解析，不绕过登录、会员、DRM 或网站访问限制。
 - 多连接不能突破实际带宽，速度取决于服务器、网络与磁盘；续传取决于服务器是否支持及文件是否变更。
 
-[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.3
 [0.5.2]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.2
 [0.5.1]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.0

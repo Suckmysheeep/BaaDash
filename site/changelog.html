@@ -29,16 +29,23 @@
     <main class="document">
       <div class="eyebrow">CHANGELOG</div>
       <h1>每一次更新，都有记录。</h1>
-      <p class="lede">v0.5.2 · 2026-11-13</p>
+      <p class="lede">v0.5.3 · 2026-11-13</p>
       <section class="section">
         <h2>修复与交互</h2>
         <ul>
-        <li>修复打开设置页时，顶部标题旁仍显示任务数量的问题。</li>
-        <li>界面缩放拖动条改为拖动中只更新数值、松开后才应用缩放：此前拖动时整个界面实时缩放，滑块在指针下漂移、难以拖准。</li>
-        <li>磁力／种子启动提速：新建窗口探测到的种子数据与已应答节点会短暂缓存，点击「开始下载」直接复用——磁力链接不再向节点做第二次元数据查询，跳过重复的「正在寻找节点」等待。</li>
-        <li>新建种子窗口专业化：任务名称可修改；显示文件数与总大小、资源哈希（一键复制）、磁力链接已发现的节点数与完整来源；文件多于 8 个时提供文件名搜索，涉及多种类型时提供类型筛选；回车可直接开始下载。</li>
+        <li>修复浏览器接管下载时把种子存成网页文件（如 attach-download-10.htm）的问题：不少站点的种子链接以 .htm 结尾、真实类型只写在响应头里。现在探测会依据响应的真实文件名与 Content-Type 识别种子，自动切换为种子视图（可选文件、显示哈希与节点数），不再把网页或种子原样存盘。</li>
+        <li>新增拖放打开：把 .torrent 文件拖到 BaaDash 任意窗口即打开新建任务窗口，与双击种子文件效果一致。</li>
+        <li>磁力链接在部分网络下长期找不到节点：DHT 引导节点从引擎内置的 2 个扩展到 5 个（增加 router.bittorrent.com、router.utorrent.com、dht.aelitis.com），在 DNS 污染或 UDP 受限的网络中明显提高磁力解析成功率；复用探测缓存启动下载时，磁力链接自带的 tracker 列表不再丢失。</li>
+        <li>新建任务窗口增加前端看门狗：即使下载引擎异常无响应，窗口也会在约 105 秒后自行恢复到可重试、可取消的状态——任何情况下窗口都关得掉。</li>
+        <li>同一链接重复点击不再叠出多个新建任务窗口，已有窗口自动置顶。</li>
+        <li>磁力链接带有 dn= 名称参数时，探测期间先行显示该名称。</li>
+        <li>扩展：.torrent 文件不再被「最小文件体积」设置拦截。</li>
         </ul>
-        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.2">查看此版本 ↗</a>
+        <h2>可观测性</h2>
+        <ul>
+        <li>磁力探测全程写入日志（开始、引擎就绪耗时、寻点结果／超时／取消），新建窗口的打开与中途取消也有记录：再次遇到异常时，设置 → 关于里的日志能直接指出停在哪一环。</li>
+        </ul>
+        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.3">查看此版本 ↗</a>
         <a class="button" href="https://github.com/Suckmysheeep/BaaDash/blob/main/CHANGELOG.md">完整历史记录 ↗</a></p>
       </section>
     </main>

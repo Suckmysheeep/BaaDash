@@ -157,7 +157,9 @@ chrome.downloads.onCreated.addListener(async (item) => {
     return;
   }
   if (await siteDisabled(item.referrer || url)) return;
+  // Torrent files are tiny; the size floor must never leave them behind.
   if (
+    !/\.torrent$/i.test(item.filename || "") &&
     settings.minSizeKB > 0 &&
     item.totalBytes > 0 &&
     item.totalBytes < settings.minSizeKB * 1024
