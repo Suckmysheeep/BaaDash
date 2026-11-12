@@ -235,8 +235,11 @@ pub fn is_torrent_url(url: String, filename: Option<String>) -> bool {
 }
 
 #[tauri::command]
-pub async fn probe_torrent(m: Mgr<'_>, url: String, headers: Vec<(String, String)>) -> Result<crate::torrent::TorrentInfo, String> {
-    crate::torrent::probe(m.client(), &url, &to_header_map(&headers)).await.map_err(|e| format!("{e:#}"))
+pub async fn probe_torrent(m: Mgr<'_>, token: u64, url: String, headers: Vec<(String, String)>) -> Result<crate::torrent::TorrentInfo, String> {
+    let cancel = m.probe_cancel(token);
+    let out = crate::torrent::probe(m.client(), &url, &to_header_map(&headers), cancel).await.map_err(|e| format!("{e:#}"));
+    m.probe_done(token);
+    out
 }
 
 #[tauri::command]

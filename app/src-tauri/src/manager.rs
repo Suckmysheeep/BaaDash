@@ -202,6 +202,7 @@ struct Inner {
     pending: Vec<Incoming>,
     /// Downloads caught from the browser, waiting in a "New download" window.
     confirms: HashMap<u64, Incoming>,
+    probe_cancels: HashMap<u64, CancellationToken>,
     next_confirm: u64,
     /// Download id -> label of the window showing its progress.
     windows: HashMap<u64, String>,
@@ -250,6 +251,7 @@ impl DownloadManager {
                 running: HashMap::new(),
                 pending: vec![],
                 confirms: HashMap::new(),
+                probe_cancels: HashMap::new(),
                 next_confirm: 1,
                 windows: HashMap::new(),
                 next_id,
@@ -568,7 +570,21 @@ impl DownloadManager {
     }
 
     pub fn forget_confirm(&self, token: u64) {
-        self.inner.lock().unwrap().confirms.remove(&token);
+        let mut g = self.inner.lock().unwrap();
+        g.confirms.remove(&token);
+        if let Some(c) = g.probe_cancels.remove(&token) {
+            c.cancel();
+        }
+    }
+
+    /// A cancel handle for an in-flight torrent probe, so closing the New
+    /// download window actually stops the peer lookup.
+    pub fn probe_cancel(&self, token: u64) -> CancellationToken {
+        self.inner.lock().unwrap().probe_cancels.entry(token).or_insert_with(CancellationToken::new).clone()
+    }
+
+    pub fn probe_done(&self, token: u64) {
+        self.inner.lock().unwrap().probe_cancels.remove(&token);
     }
 
     /// Opens (or keeps) the progress window for each newly started

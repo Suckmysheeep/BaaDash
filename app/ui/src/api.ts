@@ -146,7 +146,7 @@ export interface Commands {
   probe_note: [void, string | null];
   is_media_url: [{ url: string }, boolean];
   is_torrent_url: [{ url: string; filename: string | null }, boolean];
-  probe_torrent: [{ url: string; headers: Header[] }, TorrentInfo];
+  probe_torrent: [{ url: string; headers: Header[]; token: number }, TorrentInfo];
   open_new_download: [{ url: string }, void];
   default_dir: [{ filename: string }, string];
   add_download: [{ req: AddRequest }, number];

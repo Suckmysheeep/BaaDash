@@ -21,6 +21,7 @@ const whenFull = (ms: number | null) => {
 };
 
 const view = $("view");
+let confirmToken: number | null = null;
 
 // The window grows and shrinks to fit what it shows.
 let fitted = 0;
@@ -38,7 +39,8 @@ new ResizeObserver(fit).observe($("root"));
 const setTitle = (t: string) => { $("w-title").textContent = t; document.title = t; win?.setTitle(t); };
 
 $("w-min").onclick = () => win?.minimize();
-$("w-close").onclick = () => (win ? win.close() : window.close());
+// Closing a confirm window also cancels its backend probe, not just the UI.
+$("w-close").onclick = () => { if (confirmToken != null) invoke("forget_confirm", { token: confirmToken }); (win ? win.close() : window.close()); };
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("w-close").click(); });
 document.addEventListener("contextmenu", (e) => { if (!(e.target as HTMLElement & HTMLInputElement).closest<HTMLElement>("input")) e.preventDefault(); });
 
@@ -58,6 +60,7 @@ async function addDownload(req: AddRequest): Promise<number | null> {
 
 // ---------- New download (caught from the browser) ----------
 async function confirmView(token: number) {
+  confirmToken = token;
   setTitle("新建下载");
   const inc = await invoke("confirm_info", { token });
   if (!inc) { view.innerHTML = `<p class="muted">此下载任务已不可用。</p>`; return; }
@@ -240,21 +243,37 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
     $("c-start").disabled = $("c-later").disabled = sel.length === 0;
     const all = $("t-all"); if (all) all.checked = sel.length === info!.files.length;
   };
-  try {
-    info = await invoke("probe_torrent", { url: inc.url, headers });
-    $("c-name").value = info.name;
-    const many = info.files.length > 1;
-    $("t-files").innerHTML = (many ? `<label class="t-file t-allrow"><input type="checkbox" id="t-all" checked><span>全部文件</span><span class="muted">${bytes(info.size)}</span></label>` : "") +
-      info.files.map((f, i) => `<label class="t-file"><input type="checkbox" data-i="${i}" checked><span title="${esc(f.path)}">${esc(f.path)}</span><span class="muted">${bytes(f.size)}</span></label>`).join("");
-    $("t-files").addEventListener("change", (e) => {
-      if ((e.target as HTMLElement & HTMLInputElement).id === "t-all") view.querySelectorAll<HTMLInputElement>(".t-file input[data-i]").forEach((c) => (c.checked = (e.target as HTMLElement & HTMLInputElement).checked));
-      update();
-    });
+  let elapsed = 0, timer = 0;
+  const waitMsg = () => (magnet ? `正在寻找分享此资源的节点… 已等待 ${elapsed} 秒` : "正在读取文件列表…") + (magnet && elapsed >= 20 ? "（节点较少时可能更久，可随时取消）" : "");
+  const fill = () => {
+    $("c-name").value = info!.name;
+    const many = info!.files.length > 1;
+    $("t-files").innerHTML = (many ? `<label class="t-file t-allrow"><input type="checkbox" id="t-all" checked><span>全部文件</span><span class="muted">${bytes(info!.size)}</span></label>` : "") +
+      info!.files.map((f, i) => `<label class="t-file"><input type="checkbox" data-i="${i}" checked><span title="${esc(f.path)}">${esc(f.path)}</span><span class="muted">${bytes(f.size)}</span></label>`).join("");
     update();
     $("c-start").focus();
-  } catch (e) {
-    $("t-files").innerHTML = `<div class="t-wait"><span class="err">${esc(displayText(e))}</span></div>`;
-  }
+  };
+  const probe = async () => {
+    elapsed = 0;
+    $("c-start").disabled = $("c-later").disabled = true;
+    $("t-files").innerHTML = `<div class="t-wait"><span class="spinner"></span><span class="muted" id="t-wait-msg">${waitMsg()}</span></div>`;
+    clearInterval(timer);
+    timer = window.setInterval(() => { elapsed++; const m = $("t-wait-msg"); if (m) m.textContent = waitMsg(); }, 1000);
+    try {
+      info = await invoke("probe_torrent", { url: inc.url, headers, token });
+      clearInterval(timer);
+      fill();
+    } catch (e) {
+      clearInterval(timer);
+      $("t-files").innerHTML = `<div class="t-wait"><span class="err">${esc(displayText(e))}</span><button class="btn sm" id="t-retry">重试</button></div>`;
+      $("t-retry").onclick = () => void probe();
+    }
+  };
+  $("t-files").addEventListener("change", (e) => {
+    if ((e.target as HTMLElement & HTMLInputElement).id === "t-all") view.querySelectorAll<HTMLInputElement>(".t-file input[data-i]").forEach((c) => (c.checked = (e.target as HTMLElement & HTMLInputElement).checked));
+    update();
+  });
+  await probe();
   $("c-browse").onclick = async () => { const d = await invoke("pick_folder", { start: dir }); if (d) setDir(d); };
   $("c-cancel").onclick = () => { invoke("forget_confirm", { token }); $("w-close").click(); };
   const add = async (start: boolean) => {
@@ -277,6 +296,7 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
 // ---------- progress / complete ----------
 let current: Item | null = null, details = false, armedTimer = 0, unlisten: (() => void) | null = null;
 async function progressView(id: number) {
+  confirmToken = null;
   current = await invoke("get_item", { id });
   render();
   unlisten?.();

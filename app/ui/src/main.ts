@@ -154,6 +154,25 @@ const VIEWS: Record<string, View> = {
     test: (i) => i.status === "error",
   },
 };
+interface ViewProfile {
+  emptyIcon: string;
+  emptyTitle: string;
+  emptyText: string;
+  pauseAll: boolean;
+  resumeAll: boolean;
+  resumeLabel: string;
+  history: boolean;
+  openFolder: boolean;
+}
+const PROFILES: Record<string, ViewProfile> = {
+  all: { emptyIcon: "download", emptyTitle: "还没有下载任务", emptyText: "粘贴链接、将链接拖到此窗口，或在浏览器中开始下载。", pauseAll: true, resumeAll: true, resumeLabel: "全部继续", history: true, openFolder: false },
+  active: { emptyIcon: "arrowDown", emptyTitle: "队列空闲", emptyText: "当前没有正在下载或排队的任务。", pauseAll: true, resumeAll: true, resumeLabel: "全部继续", history: false, openFolder: false },
+  completed: { emptyIcon: "doneCircle", emptyTitle: "还没有完成记录", emptyText: "下载完成的任务会归档在这里，可打开所在文件夹或清理记录。", pauseAll: false, resumeAll: false, resumeLabel: "全部继续", history: true, openFolder: true },
+  failed: { emptyIcon: "alert", emptyTitle: "没有失败任务", emptyText: "下载失败的任务会显示在这里，可逐个或全部重试。", pauseAll: false, resumeAll: true, resumeLabel: "全部重试", history: true, openFolder: false },
+};
+const profile = (): ViewProfile => PROFILES[state.view] || PROFILES.all;
+const viewTint = () =>
+  state.view === "completed" ? "var(--green)" : state.view === "failed" ? "var(--red)" : state.view === "active" ? "var(--accent)" : CATS[state.view]?.color || "";
 const byId = (id: number | null) => state.items.find((i) => i.id === id);
 let statusFilter = "all";
 function visible() {
@@ -346,13 +365,19 @@ function renderNav() {
 // ---------- header ----------
 function renderHeader(list: Item[]) {
   const v = VIEWS[state.view];
+  const p = profile();
   $("h-icon").innerHTML = v ? icon(v.icon) : typeIcon(state.view);
+  $("h-icon").style.color = viewTint();
   $("h-name").textContent = $("dlg-settings").open ? "设置" : v ? v.name : categoryLabel(state.view);
   $("h-count").textContent = list.length ? String(list.length) : "";
-  $("btn-pause-all").hidden = !list.some(isActive);
-  $("btn-resume-all").hidden = !list.some(
+  $("btn-pause-all").hidden = !p.pauseAll || !list.some(isActive);
+  $("btn-resume-all").hidden = !p.resumeAll || !list.some(
     (i) => i.status === "paused" || i.status === "error",
   );
+  $("btn-resume-all").innerHTML = `${icon("play")}${p.resumeLabel}`;
+  $("btn-open-folder").hidden = !p.openFolder;
+  const sel = byId(state.selected);
+  $("btn-open-folder").disabled = !(p.openFolder && sel?.status === "completed");
 }
 
 // ---------- list ----------
@@ -435,16 +460,12 @@ function renderList() {
   $("empty").hidden = list.length > 0;
   if (!list.length) {
     const q = state.search.trim();
-    $("empty-title").textContent = q
-      ? "没有找到结果"
-      : state.items.length
-        ? "这里还没有内容"
-        : "还没有下载任务";
-    $("empty-text").textContent = q
-      ? `没有与“${q}”匹配的下载任务。`
-      : state.items.length
-        ? "此视图中的下载任务会显示在这里。"
-        : "粘贴链接、将链接拖到此窗口，或在浏览器中开始下载。";
+    const p = profile();
+    const isCat = !VIEWS[state.view];
+    const eIcon = $("empty").querySelector(".empty-icon");
+    if (eIcon) { eIcon.innerHTML = isCat ? typeIcon(state.view) : icon(p.emptyIcon); (eIcon as HTMLElement).style.color = viewTint(); }
+    $("empty-title").textContent = q ? "没有找到结果" : isCat ? `还没有${categoryLabel(state.view)}` : p.emptyTitle;
+    $("empty-text").textContent = q ? `没有与“${q}”匹配的下载任务。` : isCat ? `保存为${categoryLabel(state.view)}的任务会显示在这里。` : p.emptyText;
     $("empty-actions").hidden = !!q || state.items.length > 0;
   }
   return list;
@@ -2046,6 +2067,8 @@ boot();
 
 // Batch operations never treat active work as disposable history.
 function renderBulk(list: Item[]) {
+  if (list.length === 0 && bulkMode) { bulkMode = false; bulkIds.clear(); bulkAnchor = null; }
+  $("btn-select").hidden = list.length === 0;
   for (const id of bulkIds)
     if (!list.some((i) => i.id === id)) bulkIds.delete(id);
   $("bulk-bar").hidden = !bulkMode;
@@ -2060,7 +2083,7 @@ function renderBulk(list: Item[]) {
     ["paused", "error"].includes(i.status),
   );
   $("bulk-remove").disabled = !picked.length;
-  $("btn-history").hidden = state.view === "active";
+  $("btn-history").hidden = !profile().history || state.view === "active";
   $("btn-history").disabled = !list.some((i) =>
     ["completed", "error"].includes(i.status),
   );
@@ -2079,6 +2102,7 @@ $("btn-select").onclick = () => {
   }
 };
 $("bulk-exit").onclick = exitBulk;
+$("btn-open-folder").onclick = () => { const it = byId(state.selected); if (it?.status === "completed") void call("open_folder", { id: it.id }); };
 $("bulk-all").onchange = () => {
   bulkIds.clear();
   if ($("bulk-all").checked) visible().forEach((i) => bulkIds.add(i.id));

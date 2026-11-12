@@ -43,7 +43,46 @@ try{
  assert.ok(await p.locator('.row').first().evaluate(e=>e.getBoundingClientRect().height)>=56,'rows breathe on tall windows');
  assert.ok(await p.locator('#net-graph').evaluate(e=>e.getBoundingClientRect().height)>=100,'speed plot scales on tall windows');
  await p.setViewportSize({width:1120,height:820});
+ // Empty views hide multi-select and show type-specific empty copy.
+ await p.locator('[data-view="Images"]').click();
+ await p.waitForFunction(()=>document.getElementById('btn-select').hidden);
+ assert.equal(await p.locator('#empty-title').textContent(),'还没有图片');
+ assert.ok(await p.locator('#empty').isVisible());
+ await p.locator('[data-view="completed"]').click();
+ await p.waitForFunction(()=>!document.getElementById('btn-select').hidden);
+ // Completed view: a per-task folder action, never a batch open.
+ assert.ok(await p.locator('#btn-open-folder').isVisible());
+ assert.ok(await p.locator('#btn-open-folder').isDisabled());
+ assert.ok(await p.locator('#btn-pause-all').isHidden());
+ assert.ok(await p.locator('#btn-resume-all').isHidden());
+ assert.ok(await p.locator('#btn-history').isVisible());
+ await p.locator('#btn-select').click();await p.locator('#bulk-all').check();
+ assert.ok(await p.locator('#btn-open-folder').isDisabled(),'selecting many never enables a batch folder open');
+ await p.locator('#bulk-exit').click();
+ await p.locator('.row').first().click();
+ await p.waitForFunction(()=>!document.getElementById('btn-open-folder').disabled);
+ // Failed view relabels resume as retry and drops pause-all.
+ await p.locator('[data-view="failed"]').click();
+ assert.ok((await p.locator('#btn-resume-all').textContent()).includes('全部重试'));
+ assert.ok(await p.locator('#btn-pause-all').isHidden());
+ await p.locator('[data-view="all"]').click();
+ // The settings-leave confirm keeps the same inset as form-based confirms.
+ await p.locator('#btn-settings').click();await p.locator('[data-tab="appearance"]').click();
+ await p.locator('#set-scale').fill('110');await p.locator('#settings-close').click();
+ await p.waitForSelector('#dlg-settings-leave[open]');
+ assert.equal(await p.locator('#dlg-settings-leave .confirm-head').evaluate(e=>getComputedStyle(e).paddingTop),'20px');
+ assert.equal(await p.locator('#dlg-settings-leave .confirm-foot').evaluate(e=>getComputedStyle(e).paddingBottom),'20px');
+ assert.equal(await p.locator('#dlg-settings-leave h2').evaluate(e=>getComputedStyle(e).marginTop),'0px');
+ await p.locator('#settings-discard').click();
+ // Magnet confirm shows elapsed time while probing, then the file picker.
+ const m=await browser.newPage({viewport:{width:552,height:650}});m.on('pageerror',e=>errors.push(e.message));
+ await m.goto(origin+'/app/dist/download.html?confirm=1&torrent');
+ await m.waitForSelector('#t-wait-msg');
+ assert.ok((await m.locator('#t-wait-msg').textContent()).includes('已等待'));
+ await m.waitForSelector('.t-file input[data-i]');
+ assert.ok(await m.locator('#c-start').isEnabled());
+ await m.close();
  const q=await browser.newPage({viewport:{width:552,height:650}});q.on('pageerror',e=>errors.push(e.message));await q.goto(origin+'/app/dist/download.html?confirm=1&video');await q.waitForSelector('#c-start');assert.equal(await q.locator('#root').evaluate(e=>getComputedStyle(e).boxShadow),'none');assert.equal(await q.locator('#root').evaluate(e=>getComputedStyle(e).margin),'0px');
  assert.equal(await q.locator('#view').evaluate(e=>getComputedStyle(e).maxHeight),'none','confirm content is not height-capped; the window grows instead');
- assert.deepEqual(errors,[]);console.log('PASS: v0.4 graphite workspace, categories, real segment matrix, professional table, sun/moon, filters, row actions, settings save/discard/stay, responsive layout and native-frame content.');
+ assert.deepEqual(errors,[]);console.log('PASS: v0.4 graphite workspace, categories, real segment matrix, professional table, sun/moon, filters, row actions, settings save/discard/stay, responsive layout, native-frame content, empty-view multi-select hiding, per-view toolbars, single-task folder open and magnet elapsed probe.');
 }finally{await browser.close();server.close();}

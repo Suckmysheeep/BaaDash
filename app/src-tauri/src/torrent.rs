@@ -32,7 +32,9 @@ async fn session() -> Result<Arc<Session>> {
         .get_or_try_init(|| async {
             let dir = crate::browser::data_dir().join("torrents");
             std::fs::create_dir_all(&dir)?;
-            Session::new_with_opts(dir, SessionOptions::default()).await
+            tokio::time::timeout(Duration::from_secs(30), Session::new_with_opts(dir, SessionOptions::default()))
+                .await
+                .map_err(|_| anyhow!("the torrent engine took too long to start"))?
         })
         .await
         .cloned()
@@ -75,13 +77,18 @@ pub struct TorrentInfo {
 
 /// Reads a torrent's name and files without downloading it. For a magnet
 /// link this asks peers for the details first, which can take a moment.
-pub async fn probe(client: &Client, url: &str, headers: &HeaderMap) -> Result<TorrentInfo> {
-    let session = session().await?;
+pub async fn probe(client: &Client, url: &str, headers: &HeaderMap, cancel: CancellationToken) -> Result<TorrentInfo> {
+    let session = tokio::select! {
+        s = session() => s?,
+        _ = cancel.cancelled() => bail!("cancelled"),
+    };
     let add = source(client, url, headers).await?;
     let opts = AddTorrentOptions { list_only: true, ..Default::default() };
-    let resp = tokio::time::timeout(Duration::from_secs(90), session.add_torrent(add, Some(opts)))
-        .await
-        .map_err(|_| anyhow!("couldn't find anyone sharing this torrent"))??;
+    let resp = tokio::select! {
+        r = tokio::time::timeout(Duration::from_secs(90), session.add_torrent(add, Some(opts))) =>
+            r.map_err(|_| anyhow!("couldn't find anyone sharing this torrent"))??,
+        _ = cancel.cancelled() => bail!("cancelled"),
+    };
     let AddTorrentResponse::ListOnly(list) = resp else { bail!("unexpected answer from the torrent engine") };
     let info = &list.info;
     let name = info.name().map(|n| n.to_string()).unwrap_or_else(|| "torrent".into());
@@ -430,7 +437,7 @@ mod live {
         tauri::async_runtime::block_on(async {
             let client = baadash_engine::build_client().unwrap();
             let url = "https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-desktop-amd64.iso.torrent";
-            let info = probe(&client, url, &HeaderMap::new()).await.unwrap();
+            let info = probe(&client, url, &HeaderMap::new(), CancellationToken::new()).await.unwrap();
             println!("{} · {} file(s) · {} bytes", info.name, info.files.len(), info.size);
             let progress = Arc::new(Progress::default());
             let note = crate::media::Note::default();
