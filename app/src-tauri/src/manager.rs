@@ -467,6 +467,13 @@ impl DownloadManager {
         self.inner.lock().unwrap().items.iter().find(|i| i.id == id).cloned()
     }
 
+    /// The queued or running download for this exact link, if one exists.
+    pub fn find_duplicate(&self, url: &str) -> Option<u64> {
+        self.inner.lock().unwrap().items.iter()
+            .find(|i| i.url == url && matches!(i.status, Status::Queued | Status::Downloading))
+            .map(|i| i.id)
+    }
+
     /// A download arrived from the browser extension. Like IDM, it gets its
     /// own small "New download" window rather than the main window.
     /// Starts looking a YouTube video up, so its download starts at once.
@@ -682,20 +689,21 @@ impl DownloadManager {
                             other => other,
                         };
                         let job = crate::stream::Job { video: video.unwrap_or_else(|| req.url.clone()), audio, dest: req.dest.clone(), headers: req.headers.clone() };
-                        crate::stream::run(&this.client, job, progress, note.clone(), cancel).await
+                        crate::stream::run(&this.client, job, progress, note.clone(), cancel, this.limiter.clone()).await
                     }
                     Kind::Media(format) => {
                         let headers = req.headers.iter()
                             .filter_map(|(k, v)| Some((k.as_str().to_string(), v.to_str().ok()?.to_string())))
                             .collect();
                         let job = crate::media::Job { url: req.url.clone(), format, dest: req.dest.clone(), headers };
-                        crate::media::run(&this.client, job, progress, note.clone(), cancel).await
+                        crate::media::run(&this.client, job, progress, note.clone(), cancel, this.limiter.clone()).await
                     }
                     Kind::Torrent(files) => {
                         // A torrent saves into a folder; `dest` is its name inside it.
                         let dir = req.dest.parent().map(Path::to_path_buf).unwrap_or_default();
                         let seed = crate::torrent::Seed::from_setting(&this.settings().seed_until);
-                        let job = crate::torrent::Job { url: req.url.clone(), headers: req.headers.clone(), dir, files, seed };
+                        let limit = if this.ignore_limit.load(Ordering::Relaxed) { 0 } else { this.settings().speed_limit_kib.saturating_mul(1024) };
+                        let job = crate::torrent::Job { url: req.url.clone(), headers: req.headers.clone(), dir, files, seed, limit_bps: std::num::NonZeroU32::new(limit.min(u32::MAX as u64) as u32) };
                         crate::torrent::run(&this.client, job, progress, note.clone(), cancel).await
                     }
                     Kind::File => baadash_engine::run(&this.client, &req, progress, cancel, this.limiter.clone()).await,
@@ -839,7 +847,17 @@ impl DownloadManager {
                                 notify = Some(item.filename.clone());
                             }
                         }
-                        Ok(Outcome::Paused) => item.status = Status::Paused,
+                        Ok(Outcome::Paused) => {
+                            item.status = Status::Paused;
+                            // A plain download from a server without range
+                            // support cannot resume: its partial file would
+                            // only take up disk and show as progress the next
+                            // start silently throws away.
+                            if !item.resumable && item.format.is_none() && item.torrent_files.is_none() {
+                                let _ = std::fs::remove_file(baadash_engine::part_path(&item.path));
+                                item.downloaded = 0;
+                            }
+                        }
                         Err(e) => {
                             item.status = Status::Error;
                             item.error = Some(format!("{e:#}"));

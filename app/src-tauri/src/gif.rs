@@ -3,7 +3,7 @@
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use std::io::{Read as _, Write as _};
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use baadash_engine::Client;

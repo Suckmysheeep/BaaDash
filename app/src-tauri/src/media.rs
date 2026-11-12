@@ -580,7 +580,7 @@ pub struct Job {
 /// Runs yt-dlp for one download, reporting into `progress` and `note`.
 /// Cancelling stops yt-dlp; its partial files stay, so running the same job
 /// again continues where it left off.
-pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: Note, cancel: CancellationToken) -> Result<Outcome> {
+pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: Note, cancel: CancellationToken, limiter: Arc<baadash_engine::SpeedLimiter>) -> Result<Outcome> {
     // Streams arrive in pieces that ffmpeg turns into one MP4.
     let stream = is_stream_url(&job.url);
     let merges = job.format.contains('+') || stream;
@@ -599,7 +599,7 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: Note,
     // YouTube, looked up ahead of time: fetch the files ourselves, many
     // connections each, the way IDM does. yt-dlp is the fallback.
     if !stream {
-        match direct(client, &job, &progress, &note, &cancel).await {
+        match direct(client, &job, &progress, &note, &cancel, &limiter).await {
             Ok(Some(done)) => return Ok(done),
             Ok(None) => {}
             Err(e) => {
@@ -612,12 +612,12 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: Note,
 
     // First without a JavaScript runtime: yt-dlp gets going several seconds
     // sooner, and it nearly always works. If it fails, try once more with one.
-    let (mut exit, mut stderr) = attempt(&tools, &job, &progress, &note, &cancel, stream, merges, false).await?;
+    let (mut exit, mut stderr) = attempt(&tools, &job, &progress, &note, &cancel, &limiter, stream, merges, false).await?;
     if exit == Some(false) && js_runtime().is_some() && !cancel.is_cancelled() {
         crate::log::line(&format!("yt-dlp failed without {}, retrying with it: {}", js_runtime().unwrap_or(""), last_error(&stderr).unwrap_or_default()));
         set_note(&note, "Starting");
         progress.downloaded.store(0, Ordering::Relaxed);
-        (exit, stderr) = attempt(&tools, &job, &progress, &note, &cancel, stream, merges, true).await?;
+        (exit, stderr) = attempt(&tools, &job, &progress, &note, &cancel, &limiter, stream, merges, true).await?;
     }
     progress.connections.store(0, Ordering::Relaxed);
     *note.lock().unwrap() = None;
@@ -663,7 +663,7 @@ const YOUTUBE_CONNECTIONS: usize = 16;
 /// Downloads a YouTube video straight from its saved lookup with BaaDash's
 /// engine. `None` when there is no lookup or nothing in it fits, so yt-dlp
 /// should do it instead.
-async fn direct(client: &Client, job: &Job, progress: &Arc<Progress>, note: &Note, cancel: &CancellationToken) -> Result<Option<Outcome>> {
+async fn direct(client: &Client, job: &Job, progress: &Arc<Progress>, note: &Note, cancel: &CancellationToken, limiter: &Arc<baadash_engine::SpeedLimiter>) -> Result<Option<Outcome>> {
     if youtube_id(&job.url).is_none() {
         return Ok(None);
     }
@@ -699,7 +699,6 @@ async fn direct(client: &Client, job: &Job, progress: &Arc<Progress>, note: &Not
             }
         })
     };
-    let limiter = Arc::new(baadash_engine::SpeedLimiter::new(0));
     let started = std::time::Instant::now();
     let runs = parts.iter().zip(&each).map(|((f, path), p)| {
         let mut headers = baadash_engine::header::HeaderMap::new();
@@ -764,10 +763,16 @@ fn attempt_output(dest: &Path) -> PathBuf {
 
 /// One yt-dlp run. Returns how it ended (None when cancelled) and its errors.
 #[allow(clippy::too_many_arguments)]
-async fn attempt(tools: &Tools, job: &Job, progress: &Arc<Progress>, note: &Note, cancel: &CancellationToken, stream: bool, merges: bool, with_js: bool) -> Result<(Option<bool>, String)> {
+async fn attempt(tools: &Tools, job: &Job, progress: &Arc<Progress>, note: &Note, cancel: &CancellationToken, limiter: &Arc<baadash_engine::SpeedLimiter>, stream: bool, merges: bool, with_js: bool) -> Result<(Option<bool>, String)> {
     let mut cmd = if with_js { ytdlp_command(&tools.ytdlp) } else { command(&tools.ytdlp) };
     cmd.args(["-f", &job.format, "--no-playlist", "--newline", "--no-colors", "--no-mtime", "-N", "4"])
         .args(["--progress-template", "download:SDL|%(progress.status)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s"]);
+    // The global speed limit as it stands when yt-dlp starts (it can't follow
+    // later changes; our own download paths track the limit live).
+    let rate = limiter.rate();
+    if rate > 0 {
+        cmd.arg("--limit-rate").arg(rate.to_string());
+    }
     if merges {
         cmd.args(["--merge-output-format", "mp4"]);
     }
@@ -1034,7 +1039,8 @@ mod live {
         let dest = std::path::PathBuf::from(std::env::var("BAADASH_DL_OUT").unwrap());
         let client = baadash_engine::build_client().unwrap();
         let job = super::Job { url, format: "wv*+wa/w".into(), dest: dest.clone(), headers: vec![] };
-        let r = tauri::async_runtime::block_on(super::run(&client, job, Default::default(), Default::default(), Default::default()));
+        let limiter = std::sync::Arc::new(baadash_engine::SpeedLimiter::new(0));
+        let r = tauri::async_runtime::block_on(super::run(&client, job, Default::default(), Default::default(), Default::default(), limiter));
         match r {
             Ok(o) => println!("RESULT {o:?}, {} bytes", std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0)),
             Err(e) => println!("RESULT FAILED: {e:#}"),
@@ -1054,7 +1060,8 @@ mod live {
             println!("lookup: {:.1}s", t.elapsed().as_secs_f64());
             let t = std::time::Instant::now();
             let job = super::Job { url, format, dest: dest.clone(), headers: vec![] };
-            let r = super::run(&client, job, Default::default(), Default::default(), Default::default()).await.unwrap();
+            let limiter = std::sync::Arc::new(baadash_engine::SpeedLimiter::new(0));
+            let r = super::run(&client, job, Default::default(), Default::default(), Default::default(), limiter).await.unwrap();
             println!("{r:?}: download + join {:.1}s, {} bytes", t.elapsed().as_secs_f64(), std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0));
         });
     }

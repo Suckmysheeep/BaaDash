@@ -56,6 +56,9 @@ pub fn default_dir(m: Mgr, filename: String) -> PathBuf {
 pub fn add_download(m: Mgr, req: AddRequest) -> Result<u64, String> {
     check_add(&req)?;
     if req.checksum.as_ref().is_some_and(|h| h.len() != 64 || !h.bytes().all(|b| b.is_ascii_hexdigit())) { return Err("SHA-256 必须是 64 位十六进制字符".into()); }
+    if let Some(id) = m.find_duplicate(req.url.trim()) {
+        return Err(format!("此链接已在下载队列中（任务 #{id}）"));
+    }
     Ok(m.add(req))
 }
 

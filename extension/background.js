@@ -18,7 +18,11 @@ const DEFAULTS = {
   disabledSites: [],
 };
 
-const getSettings = () => chrome.storage.sync.get(DEFAULTS);
+// storage.sync is read on every caught response on busy pages; cache it and
+// drop the cache the moment settings change.
+let settingsCache = null;
+const getSettings = async () =>
+  (settingsCache ??= await chrome.storage.sync.get(DEFAULTS));
 const hostOf = (url) => {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -576,7 +580,9 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
 
 // Stop displaying stale discoveries as soon as sniffing is disabled.
 chrome.storage.onChanged.addListener(async (changes, area) => {
-  if (area !== "sync" || (!changes.sniffing && !changes.disabledSites)) return;
+  if (area !== "sync") return;
+  settingsCache = null;
+  if (!changes.sniffing && !changes.disabledSites) return;
   const all = await chrome.storage.session.get(null);
   const keys = Object.keys(all).filter((k) => k.startsWith("media:"));
   await chrome.storage.session.remove(keys);

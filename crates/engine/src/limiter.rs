@@ -23,6 +23,12 @@ impl SpeedLimiter {
         self.rate.store(bytes_per_sec, Ordering::Relaxed);
     }
 
+    /// The current limit in bytes per second; 0 means unlimited. For callers
+    /// that hand the limit to a separate process at spawn time.
+    pub fn rate(&self) -> u64 {
+        self.rate.load(Ordering::Relaxed)
+    }
+
     pub async fn take(&self, bytes: usize) {
         let rate = self.rate.load(Ordering::Relaxed);
         if rate == 0 {

@@ -391,7 +391,7 @@ async fn load(f: &Fetcher, url: &str) -> Result<Playlist> {
     bail!("couldn't find the video in the playlist")
 }
 
-pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate::media::Note, cancel: CancellationToken) -> Result<Outcome> {
+pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate::media::Note, cancel: CancellationToken, limiter: Arc<baadash_engine::SpeedLimiter>) -> Result<Outcome> {
     let f = Arc::new(Fetcher { client: client.clone(), headers: job.headers.clone() });
     let set = |t: &str| *note.lock().unwrap() = Some(t.to_string());
     // Joining needs ffmpeg; fetch it now (first time only) if it's missing.
@@ -444,12 +444,14 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
     let keys = Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::<String, Vec<u8>>::new()));
     let todo: Vec<_> = all.iter().filter(|(p, _)| !p.exists()).cloned().collect();
     let mut tasks = stream::iter(todo.into_iter().map(|(path, piece)| {
-        let (f, keys, cancel) = (f.clone(), keys.clone(), cancel.clone());
+        let (f, keys, cancel, limiter) = (f.clone(), keys.clone(), cancel.clone(), limiter.clone());
         async move {
             if cancel.is_cancelled() {
                 return Ok(None);
             }
             let mut data = f.get(&piece.url, piece.range).await.with_context(|| format!("couldn't download a piece of the video ({})", piece.url))?;
+            // The global speed limit covers streams too, not just plain files.
+            limiter.take(data.len()).await;
             if let Key::Aes128 { uri, iv } = &piece.key {
                 let key = {
                     let mut k = keys.lock().await;
@@ -494,17 +496,27 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
     }
 
     set("Joining");
-    let joined = |tag: &str| -> Result<PathBuf> {
-        let out = parts.join(format!("{tag}.joined"));
-        let mut w = std::io::BufWriter::new(std::fs::File::create(&out)?);
-        for (path, _) in all.iter().filter(|(p, _)| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with(&format!("{tag}-")))) {
-            std::io::copy(&mut std::fs::File::open(path)?, &mut w)?;
-        }
-        std::io::Write::flush(&mut w)?;
-        Ok(out)
+    // Copying gigabytes of pieces takes seconds; doing it inline would block
+    // the async runtime, stalling every other download and the UI ticker.
+    let (v, a) = {
+        let parts = parts.clone();
+        let has_audio = audio.is_some();
+        tauri::async_runtime::spawn_blocking(move || -> Result<(PathBuf, Option<PathBuf>)> {
+            let joined = |tag: &str| -> Result<PathBuf> {
+                let out = parts.join(format!("{tag}.joined"));
+                let mut w = std::io::BufWriter::new(std::fs::File::create(&out)?);
+                for (path, _) in all.iter().filter(|(p, _)| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with(&format!("{tag}-")))) {
+                    std::io::copy(&mut std::fs::File::open(path)?, &mut w)?;
+                }
+                std::io::Write::flush(&mut w)?;
+                Ok(out)
+            };
+            let v = joined("v")?;
+            let a = if has_audio { Some(joined("a")?) } else { None };
+            Ok((v, a))
+        })
+        .await??
     };
-    let v = joined("v")?;
-    let a = if audio.is_some() { Some(joined("a")?) } else { None };
     finish(&v, a.as_deref(), &job.dest).await?;
     let _ = std::fs::remove_dir_all(&parts);
     *note.lock().unwrap() = None;
@@ -619,7 +631,8 @@ mod live {
         let progress = std::sync::Arc::new(baadash_engine::Progress::default());
         let start = std::time::Instant::now();
         let job = super::Job { video: url, audio: std::env::var("BAADASH_HLS_AUDIO").ok(), dest: out.clone(), headers: Default::default() };
-        let r = tauri::async_runtime::block_on(super::run(&client, job, progress, Default::default(), Default::default())).unwrap();
+        let limiter = std::sync::Arc::new(baadash_engine::SpeedLimiter::new(0));
+        let r = tauri::async_runtime::block_on(super::run(&client, job, progress, Default::default(), Default::default(), limiter)).unwrap();
         println!("{r:?} in {:.1}s, {} bytes", start.elapsed().as_secs_f64(), std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0));
     }
 }

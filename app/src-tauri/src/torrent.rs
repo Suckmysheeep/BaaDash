@@ -128,6 +128,9 @@ pub struct Job {
     /// Indexes of the files to download; empty means all of them.
     pub files: Vec<usize>,
     pub seed: Seed,
+    /// The global download speed limit as it stood when the job started
+    /// (the engine's own limiter can't reach into the torrent session).
+    pub limit_bps: Option<std::num::NonZeroU32>,
 }
 
 /// Downloads a torrent, reporting into `progress` and `note`. Cancelling
@@ -143,6 +146,7 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
         output_folder: Some(job.dir.to_string_lossy().into_owned()),
         only_files: (!job.files.is_empty()).then(|| job.files.clone()),
         overwrite: true, // lets a paused torrent pick up the pieces already on disk
+        ratelimits: librqbit::limits::LimitsConfig { upload_bps: None, download_bps: job.limit_bps },
         ..Default::default()
     };
     let handle = tokio::select! {
@@ -443,7 +447,7 @@ mod live {
             let note = crate::media::Note::default();
             let cancel = CancellationToken::new();
             let dir = std::env::temp_dir().join("baadash-torrent-test");
-            let job = Job { url: url.into(), headers: HeaderMap::new(), dir: dir.clone(), files: vec![], seed: Seed::Stop };
+            let job = Job { url: url.into(), headers: HeaderMap::new(), dir: dir.clone(), files: vec![], seed: Seed::Stop, limit_bps: None };
             let (p, n, c) = (progress.clone(), note.clone(), cancel.clone());
             let watch = tauri::async_runtime::spawn(async move {
                 for s in 0..30 {

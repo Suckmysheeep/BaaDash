@@ -209,6 +209,22 @@ const orderIds = () =>
   grouped(visible()).flatMap((g) => g.items.map((i) => i.id));
 
 // ---------- charts ----------
+// Theme colours for the charts, read once per appearance change instead of
+// on every 500 ms redraw (getComputedStyle forces a style flush).
+let chartCss: { accent: string; line: string; faint: string; font: string } | null = null;
+window.addEventListener("appearance-change", () => { chartCss = null; });
+const chartColors = () => {
+  if (!chartCss) {
+    const css = getComputedStyle(document.documentElement);
+    chartCss = {
+      accent: css.getPropertyValue("--accent").trim(),
+      line: css.getPropertyValue("--border").trim(),
+      faint: css.getPropertyValue("--faint").trim(),
+      font: css.getPropertyValue("--font"),
+    };
+  }
+  return chartCss;
+};
 function areaChart(
   canvas: HTMLCanvasElement,
   data: number[],
@@ -225,10 +241,7 @@ function areaChart(
   const ctx = canvas.getContext("2d")!;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  const css = getComputedStyle(document.documentElement);
-  const accent = css.getPropertyValue("--accent").trim();
-  const line = css.getPropertyValue("--border").trim();
-  const faint = css.getPropertyValue("--faint").trim();
+  const { accent, line, faint, font } = chartColors();
   const max = Math.max(1, ...data) * 1.2;
   // With a scale, labels get their own margin on the right so the graph
   // never draws over them.
@@ -239,7 +252,7 @@ function areaChart(
   const yOf = (v: number) => h - bottom - (v / max) * (h - top - bottom);
   if (grid) {
     ctx.lineWidth = 1;
-    ctx.font = `500 10.5px ${css.getPropertyValue("--font")}`;
+    ctx.font = `500 10.5px ${font}`;
     ctx.textBaseline = "middle";
     const hasData = data.some((v) => v > 0);
     for (const frac of [1 / 1.2, 0.5 / 1.2, 0]) {
@@ -292,6 +305,16 @@ function areaChart(
 }
 
 // ---------- sidebar ----------
+// innerHTML never reads back identical (an SVG "<path/>" comes back as
+// "<path></path>"), so comparing against the DOM rewrote the nav on every
+// 500 ms tick: hover states flickered, and a rebuild landing between
+// mousedown and mouseup swallowed the click. Compare against what we wrote.
+const setHtml = (el: HTMLElement, html: string) => {
+  if (el.dataset.written !== html) {
+    el.innerHTML = html;
+    el.dataset.written = html;
+  }
+};
 function renderNav() {
   const count = (fn: (i: Item) => boolean) => state.items.filter(fn).length;
   const live = state.items.some((i) => i.status === "downloading");
@@ -329,7 +352,7 @@ function renderNav() {
         typeIcon(name),
         count((i) => i.category === name),
       );
-  if ($("nav").innerHTML !== html) $("nav").innerHTML = html;
+  setHtml($("nav"), html);
 
   const active = state.items.filter((i) => i.status === "downloading");
   const queued = state.items.filter((i) => i.status === "queued").length;
@@ -403,9 +426,12 @@ function set(el: RowEl, i: number, html: string) {
     el._c[i].innerHTML = html;
   }
 }
+// Queue positions for the "#n" label, computed once per renderList pass
+// instead of filtered per row.
+let queueOrder = new Map<number, number>();
 function meta(it: Item) {
   const progress = it.size ? pct(it).toFixed(1) + '%' : '—';
-  const queue = state.items.filter(i => i.status === 'queued').findIndex(i => i.id === it.id) + 1;
+  const queue = queueOrder.get(it.id) || 0;
   const status = it.status === 'queued' ? '排队 #' + queue : STATUS[it.status];
   return `<div class="m-size data-cell"><b>${bytes(it.downloaded)}</b><small>/ ${bytes(it.size)}</small></div><div class="m-progress st-${it.status}"><div><span>${status}</span><b>${progress}</b></div><span class="mini ${it.status}"><i style="width:${pct(it)}%"></i></span></div><span class="m-speed data-cell">${it.status === 'downloading' ? (it.speed > 0 ? speed(it.speed) : '连接中') : '—'}</span><span class="m-eta data-cell">${it.status === 'downloading' ? dur(eta(it)) : '—'}</span><span class="m-conns data-cell">${it.status === 'downloading' ? it.connections : 0}<small> / ${settings()?.connections || 8}</small></span>`;
 }
@@ -422,6 +448,11 @@ function updateRow(el: RowEl, it: Item) {
 }
 function renderList() {
   const list = visible();
+  queueOrder = new Map(
+    state.items
+      .filter((i) => i.status === "queued")
+      .map((i, n) => [i.id, n + 1]),
+  );
   const nodes = [];
   for (const g of grouped(list)) {
     let h = headEls.get(g.s);
@@ -437,7 +468,7 @@ function renderList() {
           ? bytes(g.items.reduce((s, i) => s + (i.size || 0), 0))
           : "";
     const html = `${statusIcon({ status: g.s, size: 4, downloaded: 3 })}<span>${g.title}</span><span class="gc">${g.items.length}</span><span class="gr">${right}</span>`;
-    if (h.innerHTML !== html) h.innerHTML = html;
+    setHtml(h, html);
     nodes.push(h);
     for (const it of g.items) {
       let el = rowEls.get(it.id);
@@ -497,7 +528,6 @@ function renderInspector() {
   const finishing = dl && !!it.size && it.downloaded >= it.size;
   const meta = `<span class="st-${it.status}">${finishing ? "正在完成…" : STATUS[it.status]}</span><span class="trunc">来自 ${esc(host(it.url))}</span>`;
   if ($("ins-chips").innerHTML !== meta) $("ins-chips").innerHTML = meta;
-
   $("ins-pct").textContent = it.size ? `${Math.floor(pct(it))}%` : "";
   const bar = $("ins-bar");
   bar.className = `segbar ${it.status}`;
@@ -534,7 +564,7 @@ function renderInspector() {
     <dt>断点续传</dt><dd><span>${it.resumable ? "支持" : "不支持，服务器未提供此功能"}</span></dd>
     <dt>添加时间</dt><dd><span>${new Date(it.addedAt).toLocaleString("zh-CN", { dateStyle: "medium", timeStyle: "short" })}</span></dd>
     ${it.error ? `<dt>错误信息</dt><dd><span style="color:var(--red)" title="${esc(displayText(it.error))}">${esc(displayText(it.error))}</span></dd>` : ""}`;
-  if ($("ins-props").innerHTML !== props) $("ins-props").innerHTML = props;
+  setHtml($("ins-props"), props);
 
   const primary =
     it.status === "completed"
@@ -545,7 +575,7 @@ function renderInspector() {
           ? `<button class="btn" data-ins="pause">暂停</button>`
           : `<button class="btn primary" data-ins="resume">继续</button>`;
   const foot = `<button class="btn" data-ins="folder">在文件夹中显示</button>${primary}<button class="btn icon" data-ins="more" title="更多操作">${icon("more")}</button>`;
-  if ($("ins-foot").innerHTML !== foot) $("ins-foot").innerHTML = foot;
+  setHtml($("ins-foot"), foot);
 }
 
 // ---------- browser integration ----------
@@ -776,11 +806,37 @@ async function call<K extends keyof Commands>(
 }
 
 // ---------- actions ----------
+// Optimistic pause/resume: flip the row at once instead of waiting for the
+// next 500 ms snapshot. A failure re-reads the backend state to undo it.
 const resume = (ids: number[]) => {
-  if (ids.length) call("resume", { ids });
+  if (!ids.length) return;
+  const want = new Set(ids);
+  let changed = false;
+  for (const it of state.items)
+    if (want.has(it.id) && (it.status === "paused" || it.status === "error")) {
+      it.status = "queued";
+      it.error = null;
+      changed = true;
+    }
+  if (changed) render();
+  call("resume", { ids }).catch(() =>
+    invoke("get_state").then((s) => ingest(s.items)),
+  );
 };
 const pause = (ids: number[]) => {
-  if (ids.length) call("pause", { ids });
+  if (!ids.length) return;
+  const want = new Set(ids);
+  let changed = false;
+  for (const it of state.items)
+    if (want.has(it.id) && isActive(it)) {
+      it.status = "paused";
+      it.speed = 0;
+      changed = true;
+    }
+  if (changed) render();
+  call("pause", { ids }).catch(() =>
+    invoke("get_state").then((s) => ingest(s.items)),
+  );
 };
 const copy = (text: string, msg: string) =>
   navigator.clipboard.writeText(text).then(() => toast(msg, "ok"));
@@ -1117,6 +1173,11 @@ document.addEventListener("keydown", (e) => {
   if (mod && k.toLowerCase() === "k") {
     e.preventDefault();
     if (!$("dlg-palette").open) openTaskSearch();
+    return;
+  }
+  // An open menu takes the first Escape; the list selection gets the next.
+  if (k === "Escape" && !$("menu").hidden) {
+    $("menu").hidden = true;
     return;
   }
   if (document.querySelector("dialog[open]") || target(e).matches?.("input"))
@@ -2061,7 +2122,9 @@ async function boot() {
     }),
   );
   setInterval(sampleSpeeds, 500);
-  addEventListener("resize", () => render());
+  // A fixed-position menu goes stale when the window moves or loses focus.
+  addEventListener("resize", () => { $("menu").hidden = true; render(); });
+  addEventListener("blur", () => { $("menu").hidden = true; });
 }
 boot();
 
