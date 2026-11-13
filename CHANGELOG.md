@@ -6,6 +6,17 @@ BaaDash 的重要变更记录于此。格式参考 [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-13
+
+### 修复与交互
+
+- BT 内核第二轮强化（逐条验证外部评审建议后落地）：
+  - 暂停不再拆除引擎任务：暂停的种子保留在引擎内（节点保持、已校验分块记得），继续下载即时恢复——此前暂停再开始要重新全盘校验并从零找节点。删除任务时引擎任务一并移除，文件即时解锁。
+  - 磁力探测缓存竞速胜出后，额外给节点网络最多 4 秒上报做种者：新建任务窗口能显示真实节点数，下载起始即有节点可连，不再完全冷启动。
+  - 公共 .torrent 种子（含重启后恢复的任务）也会补充公共 tracker——此前仅磁力链接享有；私有种子（PT）依旧绝不注入，无法解析的种子一律按私有处理。
+  - 监听升级为 TCP + uTP 双协议，可触达更严格 NAT 后的节点；单任务节点上限由 128 提至 200。
+  - 公共 tracker 源更换为国内可达性筛选的 XIU2 每日精选（ngosang 全量列表双镜像兜底），注入上限 100 条；DHT 引导节点增至 6 个。
+
 ## [0.5.4] - 2026-11-13
 
 ### 修复与交互
@@ -213,7 +224,8 @@ BaaDash 的首个正式版本，以新的项目身份发布，承接此前中文
 - 分享文本功能只提取普通链接，不增加站点专用解析，不绕过登录、会员、DRM 或网站访问限制。
 - 多连接不能突破实际带宽，速度取决于服务器、网络与磁盘；续传取决于服务器是否支持及文件是否变更。
 
-[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.5
 [0.5.4]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.4
 [0.5.3]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.3
 [0.5.2]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.2

@@ -11,7 +11,7 @@ use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, DhtSessionConf
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use baadash_engine::header::HeaderMap;
 use baadash_engine::{CancellationToken, Client, Outcome, Progress};
@@ -74,12 +74,13 @@ static SESSION: OnceCell<Arc<Session>> = OnceCell::const_new();
 /// DHT bootstrap nodes. librqbit's built-in list is only two of these, and
 /// both are unreachable from some networks (DNS poisoning, UDP filtering),
 /// which leaves magnets unfindable; asking a wider set gets in far more often.
-const BOOTSTRAP: [&str; 5] = [
+const BOOTSTRAP: [&str; 6] = [
     "router.bittorrent.com:6881",
     "router.utorrent.com:6881",
     "dht.transmissionbt.com:6881",
     "dht.libtorrent.org:25401",
     "dht.aelitis.com:6881",
+    "bttracker.debian.org:6881",
 ];
 
 async fn session() -> Result<Arc<Session>> {
@@ -91,12 +92,19 @@ async fn session() -> Result<Arc<Session>> {
                 bootstrap_addrs: Some(BOOTSTRAP.iter().map(|s| s.to_string()).collect()),
                 ..Default::default()
             };
-            // Listen for incoming connections too, and ask the router to
-            // forward the port (UPnP). Without this the engine only ever
+            // Listen for incoming connections too — TCP and uTP (UDP),
+            // which reaches peers behind stricter NATs — and ask the router
+            // to forward the port (UPnP). Without this the engine only ever
             // dials out, which halves the reachable swarm — and on CGNAT
             // networks incoming is often the only way to reach rare swarms.
-            let listen = ListenerOptions { enable_upnp_port_forwarding: true, ..Default::default() };
-            let opts = SessionOptions { dht: Some(dht), listen: Some(listen), ..Default::default() };
+            let listen = ListenerOptions {
+                mode: librqbit::ListenerMode::TcpAndUtp,
+                enable_upnp_port_forwarding: true,
+                ..Default::default()
+            };
+            // 200 peers per torrent (the engine caps at 128 by default):
+            // dead peers holding slots is the norm on residential networks.
+            let opts = SessionOptions { dht: Some(dht), listen: Some(listen), peer_limit: Some(200), ..Default::default() };
             let started = std::time::Instant::now();
             let session = tokio::time::timeout(Duration::from_secs(30), Session::new_with_opts(dir, opts))
                 .await
@@ -109,11 +117,13 @@ async fn session() -> Result<Arc<Session>> {
 }
 
 /// Public trackers give magnets far more peers than the link itself carries.
-/// The list is ngosang/trackerslist (a well-maintained best-of), with a
-/// jsDelivr mirror for networks that can't reach GitHub's raw domain.
-const TRACKER_SOURCES: [&str; 2] = [
-    "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt",
-    "https://cdn.jsdelivr.net/gh/ngosang/trackerslist@master/trackers_best.txt",
+/// XIU2's list (selected for reachability from Chinese networks) is the
+/// primary source; ngosang/trackerslist's full list, via jsDelivr or GitHub,
+/// is the fallback.
+const TRACKER_SOURCES: [&str; 3] = [
+    "https://cf.trackerslist.com/best.txt",
+    "https://cdn.jsdelivr.net/gh/ngosang/trackerslist@master/trackers_all.txt",
+    "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_all.txt",
 ];
 const TRACKER_TTL: Duration = Duration::from_secs(24 * 3600);
 
@@ -128,7 +138,7 @@ fn public_trackers() -> Vec<String> {
 pub async fn refresh_trackers(client: &Client, data_dir: &Path) {
     let file = data_dir.join("trackers.txt");
     if let Ok(text) = std::fs::read_to_string(&file) {
-        let list: Vec<String> = text.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_string).collect();
+        let list: Vec<String> = text.lines().map(str::trim).filter(|l| !l.is_empty()).take(100).map(str::to_string).collect();
         if !list.is_empty() {
             *PUBLIC_TRACKERS.write().unwrap_or_else(|e| e.into_inner()) = list;
         }
@@ -146,7 +156,7 @@ pub async fn refresh_trackers(client: &Client, data_dir: &Path) {
             resp.text().await
         };
         if let Ok(Ok(text)) = tokio::time::timeout(Duration::from_secs(15), fetched).await {
-            let list: Vec<String> = text.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_string).collect();
+            let list: Vec<String> = text.lines().map(str::trim).filter(|l| !l.is_empty()).take(100).map(str::to_string).collect();
             if list.len() >= 10 {
                 crate::log::line(&format!("public tracker list updated: {} trackers", list.len()));
                 *PUBLIC_TRACKERS.write().unwrap_or_else(|e| e.into_inner()) = list.clone();
@@ -158,24 +168,33 @@ pub async fn refresh_trackers(client: &Client, data_dir: &Path) {
     crate::log::line("could not refresh the public tracker list");
 }
 
+/// The private flag inside .torrent bytes: private (PT) swarms must never
+/// be announced to public trackers. A file that won't parse is treated as
+/// private — caution costs nothing here.
+fn torrent_private(bytes: &[u8]) -> bool {
+    librqbit::torrent_from_bytes(bytes).map(|t| t.info.data.private).unwrap_or(true)
+}
+
 /// What to give the engine: magnets as they are; .torrent files are read
 /// (local) or fetched with the page's cookies (web), since many sites only
-/// hand them out to a signed-in browser.
-async fn source(client: &Client, url: &str, headers: &HeaderMap) -> Result<AddTorrent<'static>> {
+/// hand them out to a signed-in browser. The bytes come along too: they
+/// carry the private flag.
+async fn source(client: &Client, url: &str, headers: &HeaderMap) -> Result<(AddTorrent<'static>, Option<Vec<u8>>)> {
     let url = url.trim();
     if url.starts_with("magnet:") {
-        return Ok(AddTorrent::from_url(url.to_string()));
+        return Ok((AddTorrent::from_url(url.to_string()), None));
     }
-    if url.starts_with("http://") || url.starts_with("https://") {
+    let bytes = if url.starts_with("http://") || url.starts_with("https://") {
         let resp = client.get(url).headers(headers.clone()).send().await?.error_for_status()?;
-        let bytes = resp.bytes().await?;
-        if bytes.first() != Some(&b'd') {
-            bail!("that link didn't return a .torrent file");
-        }
-        return Ok(AddTorrent::from_bytes(bytes.to_vec()));
+        resp.bytes().await?.to_vec()
+    } else {
+        let path = url.strip_prefix("file://").unwrap_or(url);
+        std::fs::read(path).with_context(|| format!("couldn't read {path}"))?
+    };
+    if bytes.first() != Some(&b'd') {
+        bail!("that link didn't return a .torrent file");
     }
-    let path = url.strip_prefix("file://").unwrap_or(url);
-    Ok(AddTorrent::from_bytes(std::fs::read(path).with_context(|| format!("couldn't read {path}"))?))
+    Ok((AddTorrent::from_bytes(bytes.clone()), Some(bytes)))
 }
 
 #[derive(Serialize)]
@@ -200,6 +219,7 @@ pub struct TorrentInfo {
 /// A probe's result, kept briefly: starting the download then adds the
 /// torrent from the bytes already fetched and the peers already found,
 /// instead of asking the swarm for the metadata a second time.
+#[derive(Clone)]
 struct Probed {
     bytes: Vec<u8>,
     peers: Vec<std::net::SocketAddr>,
@@ -220,11 +240,30 @@ fn keep_probed(url: &str, bytes: &[u8], peers: Vec<std::net::SocketAddr>, privat
     g.push((url.to_string(), Probed { bytes: bytes.to_vec(), peers, private, at: std::time::Instant::now() }));
 }
 
-fn take_probed(url: &str) -> Option<Probed> {
+fn get_probed(url: &str) -> Option<Probed> {
     let mut g = PROBED.lock().unwrap();
     g.retain(|(_, p)| p.at.elapsed() < PROBED_TTL);
-    let i = g.iter().position(|(u, _)| u == url)?;
-    Some(g.remove(i).1)
+    g.iter().find(|(u, _)| u == url).map(|(_, p)| p.clone())
+}
+
+/// Paused downloads stay in the engine — files open, peers warm, checked
+/// pieces remembered — so resuming is instant instead of a cold start.
+/// Keyed by the job's link.
+static PAUSED: Mutex<Vec<(String, Arc<librqbit::ManagedTorrent>)>> = Mutex::new(Vec::new());
+
+fn take_paused(url: &str) -> Option<Arc<librqbit::ManagedTorrent>> {
+    let mut g = PAUSED.lock().unwrap();
+    g.iter().position(|(u, _)| u == url).map(|i| g.remove(i).1)
+}
+
+/// A paused task that gets deleted leaves the engine too (its files unlock).
+pub fn drop_paused(url: &str) {
+    if let (Some(handle), Some(session)) = (take_paused(url), SESSION.get()) {
+        let session = session.clone();
+        tauri::async_runtime::spawn(async move {
+            let _ = session.delete(handle.id().into(), false).await;
+        });
+    }
 }
 
 /// Reads a torrent's name and files without downloading it. For a magnet
@@ -239,10 +278,13 @@ pub async fn probe(client: &Client, url: &str, headers: &HeaderMap, cancel: Canc
         s = session() => s?,
         _ = cancel.cancelled() => { crate::log::line("torrent probe cancelled before the engine was up"); bail!("cancelled") }
     };
-    let add = source(client, url, headers).await?;
-    // Public trackers join a magnet's own: the more places we ask, the sooner
-    // someone answers. .torrent files keep their own trackers untouched.
-    let extra: Vec<String> = if auto_trackers && url.trim().starts_with("magnet:") { public_trackers() } else { vec![] };
+    let (add, src_bytes) = source(client, url, headers).await?;
+    // Public trackers join in, except for private swarms (PT), where they
+    // must never be announced. Magnets are public by nature; a .torrent's
+    // flag is in its bytes — plenty of public torrents ship with trackers
+    // long dead, and asking the public list finds peers for them too.
+    let private = src_bytes.as_deref().is_some_and(torrent_private);
+    let extra: Vec<String> = if auto_trackers && !private { public_trackers() } else { vec![] };
     let list_opts = || AddTorrentOptions { list_only: true, trackers: (!extra.is_empty()).then(|| extra.clone()), ..Default::default() };
     // Two roads to a magnet's metadata race each other: the swarm
     // (DHT/trackers) and public caches keyed by info hash. On networks where
@@ -267,7 +309,18 @@ pub async fn probe(client: &Client, url: &str, headers: &HeaderMap, cancel: Canc
                 Ok(bytes) => {
                     crate::log::line(&format!("torrent probe: metadata cache answered in {:.1}s: {short}", started.elapsed().as_secs_f64()));
                     match session.add_torrent(AddTorrent::from_bytes(bytes), Some(list_opts())).await {
-                        Ok(resp @ AddTorrentResponse::ListOnly(_)) => resp,
+                        Ok(cached @ AddTorrentResponse::ListOnly(_)) => {
+                            // The cache is fast but knows no peers (a file
+                            // list from bytes needs no swarm). Give the swarm
+                            // a moment to name who's sharing, then prefer it.
+                            match tokio::time::timeout(Duration::from_secs(4), &mut from_swarm).await {
+                                Ok(Ok(swarm @ AddTorrentResponse::ListOnly(_))) => {
+                                    crate::log::line(&format!("torrent probe: swarm answered in {:.1}s: {short}", started.elapsed().as_secs_f64()));
+                                    swarm
+                                }
+                                _ => cached,
+                            }
+                        }
                         other => {
                             let why = other.err().map(|e| format!("{e:#}")).unwrap_or_else(|| "unexpected answer".into());
                             crate::log::line(&format!("torrent probe: cached metadata rejected ({why}); waiting on the swarm"));
@@ -349,6 +402,9 @@ pub struct Job {
     /// Settings > General: ask public trackers for more peers (never for
     /// private swarms).
     pub auto_trackers: bool,
+    /// Cleared when the task is being deleted: pausing then removes the
+    /// engine task instead of keeping it warm.
+    pub warm_pause: Arc<AtomicBool>,
 }
 
 /// Downloads a torrent, reporting into `progress` and `note`. Cancelling
@@ -359,43 +415,65 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
     set_note(Some(if job.url.starts_with("magnet:") { "Finding peers".into() } else { "Starting".into() }));
     let session = session().await?;
     std::fs::create_dir_all(&job.dir)?;
-    // The New download window already probed this torrent: reuse its bytes
-    // and the peers that answered, skipping a second swarm lookup. The bytes
-    // carry no trackers, so the magnet's own `tr=` list goes back in —
-    // on networks where DHT is blocked those trackers are the only peers.
-    let probed = take_probed(job.url.trim());
-    // Public trackers join in, except for private swarms (PT), where they
-    // must never be announced. Magnets are public by nature; for files the
-    // probe has already told us.
-    let private = probed.as_ref().is_some_and(|p| p.private);
-    let allow_public = job.auto_trackers && !private && (job.url.starts_with("magnet:") || probed.is_some());
-    let (add, initial_peers) = match probed {
-        Some(p) => {
-            set_note(Some("Starting".into()));
-            (AddTorrent::from_bytes(p.bytes), (!p.peers.is_empty()).then_some(p.peers))
-        }
-        None => (source(client, &job.url, &job.headers).await?, None),
-    };
-    let mut trackers = magnet_trackers(&job.url).unwrap_or_default();
-    if allow_public {
-        for t in public_trackers() {
-            if !trackers.contains(&t) {
-                trackers.push(t);
+    // A paused download is still in the engine: resuming it keeps the warm
+    // peers and skips the disk re-check entirely.
+    let mut resumed = take_paused(job.url.trim());
+    if let Some(h) = &resumed {
+        match session.unpause(h).await {
+            Ok(()) => set_note(Some("Resuming".into())),
+            Err(e) => {
+                crate::log::line(&format!("paused torrent would not resume ({e:#}); starting it fresh"));
+                let _ = session.delete(h.id().into(), false).await;
+                resumed = None;
             }
         }
     }
-    let opts = AddTorrentOptions {
-        output_folder: Some(job.dir.to_string_lossy().into_owned()),
-        only_files: (!job.files.is_empty()).then(|| job.files.clone()),
-        overwrite: true, // lets a paused torrent pick up the pieces already on disk
-        ratelimits: librqbit::limits::LimitsConfig { upload_bps: None, download_bps: job.limit_bps },
-        initial_peers,
-        trackers: (!trackers.is_empty()).then_some(trackers),
-        ..Default::default()
-    };
-    let handle = tokio::select! {
-        r = session.add_torrent(add, Some(opts)) => r?.into_handle().ok_or_else(|| anyhow!("the torrent wasn't started"))?,
-        _ = cancel.cancelled() => { set_note(None); return Ok(Outcome::Paused); }
+    let handle = match resumed {
+        Some(h) => h,
+        None => {
+            // The New download window already probed this torrent: reuse its
+            // bytes and the peers that answered, skipping a second swarm
+            // lookup. The bytes carry no trackers, so the magnet's own `tr=`
+            // list goes back in — on networks where DHT is blocked those
+            // trackers are the only peers.
+            let probed = get_probed(job.url.trim());
+            let (add, initial_peers, private) = match probed {
+                Some(p) => {
+                    set_note(Some("Starting".into()));
+                    (AddTorrent::from_bytes(p.bytes), (!p.peers.is_empty()).then_some(p.peers), p.private)
+                }
+                None => {
+                    let (add, bytes) = source(client, &job.url, &job.headers).await?;
+                    (add, None, bytes.as_deref().is_some_and(torrent_private))
+                }
+            };
+            // Public trackers join in, except for private swarms (PT), where
+            // they must never be announced. Magnets are public by nature; a
+            // .torrent's flag is in its bytes — the probe's answer, or the
+            // file itself when there's no probe (resuming after a restart).
+            let allow_public = job.auto_trackers && !private;
+            let mut trackers = magnet_trackers(&job.url).unwrap_or_default();
+            if allow_public {
+                for t in public_trackers() {
+                    if !trackers.contains(&t) {
+                        trackers.push(t);
+                    }
+                }
+            }
+            let opts = AddTorrentOptions {
+                output_folder: Some(job.dir.to_string_lossy().into_owned()),
+                only_files: (!job.files.is_empty()).then(|| job.files.clone()),
+                overwrite: true, // lets a fresh start pick up the pieces already on disk
+                ratelimits: librqbit::limits::LimitsConfig { upload_bps: None, download_bps: job.limit_bps },
+                initial_peers,
+                trackers: (!trackers.is_empty()).then_some(trackers),
+                ..Default::default()
+            };
+            tokio::select! {
+                r = session.add_torrent(add, Some(opts)) => r?.into_handle().ok_or_else(|| anyhow!("the torrent wasn't started"))?,
+                _ = cancel.cancelled() => { set_note(None); return Ok(Outcome::Paused); }
+            }
+        }
     };
 
     let mut silent_since: Option<std::time::Instant> = None;
@@ -446,6 +524,31 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
     progress.connections.store(0, Ordering::Relaxed);
     set_note(None);
     match (&outcome, job.seed) {
+        // Paused: keep the engine task warm — its peers stay connected and
+        // its checked pieces stay known, so resuming is instant. A task
+        // being deleted has cleared its warm flag and falls through to
+        // removal instead.
+        (Ok(Outcome::Paused), _) if job.warm_pause.load(Ordering::Relaxed) => {
+            match session.pause(&handle).await {
+                Ok(()) => {
+                    // Deletion may have landed while the pause was in flight;
+                    // re-check the flag under the lock so drop_paused and
+                    // this store can't pass each other.
+                    let mut g = PAUSED.lock().unwrap();
+                    if job.warm_pause.load(Ordering::Relaxed) {
+                        g.retain(|(u, _)| u != job.url.trim());
+                        g.push((job.url.trim().to_string(), handle));
+                    } else {
+                        drop(g);
+                        let _ = session.delete(handle.id().into(), false).await;
+                    }
+                }
+                Err(e) => {
+                    crate::log::line(&format!("could not keep the paused torrent warm ({e:#}); removing it from the engine"));
+                    let _ = session.delete(handle.id().into(), false).await;
+                }
+            }
+        }
         // Finished and set to keep sharing: the download is complete now,
         // and sharing carries on in the background until its limit.
         (Ok(Outcome::Completed), seed @ (Seed::Ratio(_) | Seed::Forever)) => {
@@ -703,6 +806,16 @@ mod tests {
     }
 
     #[test]
+    fn reads_the_private_flag() {
+        // Minimal hand-built torrents (dict keys in bencode order).
+        let public = b"d4:infod6:lengthi1e4:name1:a12:piece lengthi16384e6:pieces20:aaaaaaaaaaaaaaaaaaaaee";
+        let private = b"d4:infod6:lengthi1e4:name1:a12:piece lengthi16384e6:pieces20:aaaaaaaaaaaaaaaaaaaa7:privatei1eee";
+        assert!(!torrent_private(public));
+        assert!(torrent_private(private));
+        assert!(torrent_private(b"garbage")); // unparseable: better safe than announcing PT
+    }
+
+    #[test]
     fn pulls_the_hash_out_of_a_magnet() {
         let h40 = "dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c";
         assert_eq!(magnet_hash(&format!("magnet:?xt=urn:btih:{h40}&dn=Name")), Some(h40.to_string()));
@@ -731,7 +844,7 @@ mod live {
             let note = crate::media::Note::default();
             let cancel = CancellationToken::new();
             let dir = std::env::temp_dir().join("baadash-torrent-test");
-            let job = Job { url: url.into(), headers: HeaderMap::new(), dir: dir.clone(), files: vec![], seed: Seed::Stop, limit_bps: None, auto_trackers: true };
+            let job = Job { url: url.into(), headers: HeaderMap::new(), dir: dir.clone(), files: vec![], seed: Seed::Stop, limit_bps: None, auto_trackers: true, warm_pause: Arc::new(AtomicBool::new(true)) };
             let (p, n, c) = (progress.clone(), note.clone(), cancel.clone());
             let watch = tauri::async_runtime::spawn(async move {
                 for s in 0..30 {

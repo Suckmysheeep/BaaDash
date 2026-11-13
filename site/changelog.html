@@ -29,18 +29,18 @@
     <main class="document">
       <div class="eyebrow">CHANGELOG</div>
       <h1>每一次更新，都有记录。</h1>
-      <p class="lede">v0.5.4 · 2026-11-13</p>
+      <p class="lede">v0.5.5 · 2026-11-13</p>
       <section class="section">
         <h2>修复与交互</h2>
         <ul>
-        <li>BT 内核强化（参考 koi-bt 等成熟产品的做法）：</li>
-        <li>引擎现在监听入站连接并通过 UPnP 自动映射端口——此前只拨出、别人永远连不进来，冷门资源可连节点少一半。</li>
-        <li>磁力探测双路竞速：向节点查询元数据的同时，按资源哈希并行请求公共种子缓存站并校验哈希，谁先答用谁——DHT 被污染或受限的网络里，磁力解析从约 90 秒缩短到几秒。</li>
-        <li>自动补充公共 tracker（ngosang/trackerslist 每日更新、本地缓存、含国内可达镜像）：磁力解析与下载都会询问更多节点。私有种子（PT）绝不注入。设置 → 通用中可关闭。</li>
-        <li>死种早提示：磁力探测 60 秒无节点应答时明确提示可能是死种或网络受限；下载中连续 5 分钟零节点时说明「这个种子可能已经没人分享了」，不再无解释地空等。</li>
-        <li>种子信息来自缓存站且节点为零时，新建任务窗口提示「下载可能长期没有速度」。</li>
+        <li>BT 内核第二轮强化（逐条验证外部评审建议后落地）：</li>
+        <li>暂停不再拆除引擎任务：暂停的种子保留在引擎内（节点保持、已校验分块记得），继续下载即时恢复——此前暂停再开始要重新全盘校验并从零找节点。删除任务时引擎任务一并移除，文件即时解锁。</li>
+        <li>磁力探测缓存竞速胜出后，额外给节点网络最多 4 秒上报做种者：新建任务窗口能显示真实节点数，下载起始即有节点可连，不再完全冷启动。</li>
+        <li>公共 .torrent 种子（含重启后恢复的任务）也会补充公共 tracker——此前仅磁力链接享有；私有种子（PT）依旧绝不注入，无法解析的种子一律按私有处理。</li>
+        <li>监听升级为 TCP + uTP 双协议，可触达更严格 NAT 后的节点；单任务节点上限由 128 提至 200。</li>
+        <li>公共 tracker 源更换为国内可达性筛选的 XIU2 每日精选（ngosang 全量列表双镜像兜底），注入上限 100 条；DHT 引导节点增至 6 个。</li>
         </ul>
-        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.4">查看此版本 ↗</a>
+        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.5">查看此版本 ↗</a>
         <a class="button" href="https://github.com/Suckmysheeep/BaaDash/blob/main/CHANGELOG.md">完整历史记录 ↗</a></p>
       </section>
     </main>
