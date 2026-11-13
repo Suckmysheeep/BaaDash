@@ -356,7 +356,7 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
     if (!sel.length) return;
     const files = sel.length === info.files.length ? [] : sel;
     const size = sel.reduce((a, i) => a + info!.files[i].size, 0);
-    const id = await addDownload({ url: inc.url, filename: $("c-name").value.trim() || info.name, dir, headers, start, window: win?.label, size, torrentFiles: files, torrentPaths: sel.map((i) => info!.files[i].path) });
+    const id = await addDownload({ url: inc.url, filename: $("c-name").value.trim() || info.name, dir, headers, start, window: win?.label, size, torrentFiles: files, torrentPaths: info.files.map((f) => f.path) });
     if (id == null) return;
     invoke("forget_confirm", { token });
     // Starting hands the task to the main window's list, so this window's

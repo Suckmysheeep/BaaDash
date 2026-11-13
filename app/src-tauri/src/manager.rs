@@ -758,7 +758,7 @@ impl DownloadManager {
                         },
                     );
                     let kind = match (&item.torrent_files, &item.format) {
-                        (Some(files), _) => Kind::Torrent(files.clone()),
+                        (Some(files), _) => Kind::Torrent(files.clone(), item.torrent_paths.clone().unwrap_or_default()),
                         (None, Some(format)) => Kind::Media(format.clone()),
                         (None, None) => Kind::File,
                     };
@@ -792,13 +792,13 @@ impl DownloadManager {
                         let job = crate::media::Job { url: req.url.clone(), format, dest: req.dest.clone(), headers };
                         crate::media::run(&this.client, job, progress, note.clone(), cancel, this.limiter.clone()).await
                     }
-                    Kind::Torrent(files) => {
+                    Kind::Torrent(files, payload) => {
                         // A torrent saves into a folder; `dest` is its name inside it.
                         let dir = req.dest.parent().map(Path::to_path_buf).unwrap_or_default();
                         let seed = crate::torrent::Seed::from_setting(&this.settings().seed_until);
                         let limit = if this.ignore_limit.load(Ordering::Relaxed) { 0 } else { this.settings().speed_limit_kib.saturating_mul(1024) };
                         let warm_pause = this.inner.lock().unwrap().running.get(&id).map(|r| r.warm_pause.clone()).unwrap_or_else(|| Arc::new(AtomicBool::new(true)));
-                        let job = crate::torrent::Job { url: req.url.clone(), headers: req.headers.clone(), dir, files, seed, limit_bps: std::num::NonZeroU32::new(limit.min(u32::MAX as u64) as u32), auto_trackers: this.settings().auto_trackers, warm_pause };
+                        let job = crate::torrent::Job { url: req.url.clone(), headers: req.headers.clone(), dir, files, seed, limit_bps: std::num::NonZeroU32::new(limit.min(u32::MAX as u64) as u32), auto_trackers: this.settings().auto_trackers, warm_pause, payload };
                         crate::torrent::run(&this.client, job, progress, note.clone(), cancel).await
                     }
                     Kind::File => baadash_engine::run(&this.client, &req, progress, cancel, this.limiter.clone()).await,
@@ -1088,8 +1088,9 @@ enum Kind {
     File,
     /// A video site, through yt-dlp, with this format.
     Media(String),
-    /// A torrent or magnet link, with these files (empty = all).
-    Torrent(Vec<usize>),
+    /// A torrent or magnet link, with these files (empty = all) and the
+    /// payload paths of the whole torrent (for placeholder pruning).
+    Torrent(Vec<usize>, Vec<String>),
 }
 
 pub fn to_header_map(headers: &[(String, String)]) -> HeaderMap {

@@ -368,6 +368,34 @@ pub async fn probe(client: &Client, url: &str, headers: &HeaderMap, cancel: Canc
     Ok(TorrentInfo { name, files, size, hash: list.info_hash.as_string(), peers: list.seen_peers.len() })
 }
 
+/// librqbit opens every file in a torrent the moment it's added, so the
+/// files the user didn't choose sit in the folder as zero-byte placeholders.
+/// Remove those once the engine is live — and only those: an unselected
+/// file with content belongs to an earlier download and stays.
+fn prune_unselected(dir: &Path, payload: &[String], selected: &[usize]) {
+    let keep: std::collections::HashSet<usize> = selected.iter().copied().collect();
+    for (i, rel) in payload.iter().enumerate() {
+        if keep.contains(&i) {
+            continue;
+        }
+        let p = dir.join(rel);
+        if !p.starts_with(dir) {
+            continue;
+        }
+        if std::fs::metadata(&p).map(|m| m.len() > 0).unwrap_or(true) {
+            continue;
+        }
+        let _ = std::fs::remove_file(&p);
+        let mut up = p.parent();
+        while let Some(d) = up {
+            if d == dir || std::fs::remove_dir(d).is_err() {
+                break;
+            }
+            up = d.parent();
+        }
+    }
+}
+
 /// What happens after a torrent finishes (Settings > General).
 #[derive(Clone, Copy)]
 pub enum Seed {
@@ -405,6 +433,9 @@ pub struct Job {
     /// Cleared when the task is being deleted: pausing then removes the
     /// engine task instead of keeping it warm.
     pub warm_pause: Arc<AtomicBool>,
+    /// Every file path in the torrent, relative to `dir` (index-aligned with
+    /// the engine's file list). Used to prune placeholder files.
+    pub payload: Vec<String>,
 }
 
 /// Downloads a torrent, reporting into `progress` and `note`. Cancelling
@@ -477,6 +508,7 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
     };
 
     let mut silent_since: Option<std::time::Instant> = None;
+    let mut pruned = job.files.is_empty() || job.payload.is_empty();
     let outcome = loop {
         let stats = handle.stats();
         if let Some(e) = &stats.error {
@@ -494,6 +526,10 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
         }
         match &stats.live {
             Some(live) => {
+                if !pruned {
+                    pruned = true;
+                    prune_unselected(&job.dir, &job.payload, &job.files);
+                }
                 let peers = live.snapshot.peer_stats.live;
                 let seeds = live.snapshot.peer_stats.live_seeders;
                 progress.connections.store(peers as usize, Ordering::Relaxed);
@@ -816,6 +852,22 @@ mod tests {
     }
 
     #[test]
+    fn prunes_only_the_empty_unselected_files() {
+        let dir = std::env::temp_dir().join(format!("baadash-prune-{}", std::process::id()));
+        let sub = dir.join("pack");
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::write(sub.join("wanted.bin"), b"data").unwrap();
+        std::fs::write(sub.join("skip-empty.bin"), b"").unwrap();
+        std::fs::write(sub.join("skip-content.bin"), b"old download").unwrap();
+        let payload = vec!["pack/wanted.bin".into(), "pack/skip-empty.bin".into(), "pack/skip-content.bin".into()];
+        prune_unselected(&dir, &payload, &[0]);
+        assert!(sub.join("wanted.bin").exists());
+        assert!(!sub.join("skip-empty.bin").exists(), "zero-byte placeholder should be pruned");
+        assert!(sub.join("skip-content.bin").exists(), "a file with content is an earlier download's and stays");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn pulls_the_hash_out_of_a_magnet() {
         let h40 = "dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c";
         assert_eq!(magnet_hash(&format!("magnet:?xt=urn:btih:{h40}&dn=Name")), Some(h40.to_string()));
@@ -844,7 +896,7 @@ mod live {
             let note = crate::media::Note::default();
             let cancel = CancellationToken::new();
             let dir = std::env::temp_dir().join("baadash-torrent-test");
-            let job = Job { url: url.into(), headers: HeaderMap::new(), dir: dir.clone(), files: vec![], seed: Seed::Stop, limit_bps: None, auto_trackers: true, warm_pause: Arc::new(AtomicBool::new(true)) };
+            let job = Job { url: url.into(), headers: HeaderMap::new(), dir: dir.clone(), files: vec![], seed: Seed::Stop, limit_bps: None, auto_trackers: true, warm_pause: Arc::new(AtomicBool::new(true)), payload: vec![] };
             let (p, n, c) = (progress.clone(), note.clone(), cancel.clone());
             let watch = tauri::async_runtime::spawn(async move {
                 for s in 0..30 {

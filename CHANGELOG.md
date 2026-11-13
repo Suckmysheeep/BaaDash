@@ -6,6 +6,13 @@ BaaDash 的重要变更记录于此。格式参考 [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-13
+
+### 修复
+
+- **种子里未勾选的文件不再出现在下载文件夹**：引擎在添加任务时会把种内每个文件都先创建出来（未勾选的只是 0 字节占位），现在下载一开始就把这些空占位清掉——未勾选但已有内容的文件（属此前下载）不会被误删。
+- 「取消并删除文件」现在连同这些占位文件一起清理：此前只删勾选文件，占位文件残留。
+
 ## [0.6.0] - 2026-11-13
 
 ### 交互升级
@@ -237,7 +244,8 @@ BaaDash 的首个正式版本，以新的项目身份发布，承接此前中文
 - 分享文本功能只提取普通链接，不增加站点专用解析，不绕过登录、会员、DRM 或网站访问限制。
 - 多连接不能突破实际带宽，速度取决于服务器、网络与磁盘；续传取决于服务器是否支持及文件是否变更。
 
-[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.6.1
 [0.6.0]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.6.0
 [0.5.5]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.5
 [0.5.4]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.4
