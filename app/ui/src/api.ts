@@ -138,6 +138,7 @@ export interface AddRequest {
   format?: string | null;
   size?: number | null;
   torrentFiles?: number[] | null;
+  torrentPaths?: string[] | null;
 }
 
 type Ids = { ids: number[] };
@@ -157,6 +158,7 @@ export interface Commands {
   add_download: [{ req: AddRequest }, number];
   pause: [Ids, void];
   resume: [Ids, void];
+  cancel: [Ids, void];
   remove: [Ids & { deleteFiles: boolean }, void];
   clear_history: [Ids & { deleteFiles: boolean; deleteTemp: boolean }, void];
   open_file: [{ id: number }, void];

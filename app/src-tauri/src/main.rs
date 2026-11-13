@@ -145,6 +145,7 @@ fn main() {
             commands::add_download,
             commands::pause,
             commands::resume,
+            commands::cancel,
             commands::remove,
             commands::clear_history,
             commands::open_file,

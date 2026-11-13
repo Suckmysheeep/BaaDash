@@ -848,21 +848,25 @@ function toggle(it: Item | null | undefined) {
 function askDelete(it: Item | null | undefined) {
   if (!it) return;
   const dlg = $("dlg-delete");
-  const label = $("del-files-row").querySelector("span");
-  if (label) label.textContent = "同时删除磁盘上的文件";
-  const live = it.status !== "completed";
+  const live = !["completed", "error"].includes(it.status);
   $("del-title").textContent = live ? "取消此下载？" : "从列表中移除？";
   $("del-text").textContent = live
-    ? `“${it.filename}”将停止下载，已下载的临时数据也会被删除。`
-    : `“${it.filename}”将从 BaaDash 列表中移除。`;
-  $("del-ok").textContent = live ? "取消下载" : "移除";
-  $("del-files").checked = false;
-  $("del-files-row").hidden = live;
+    ? `“${it.filename}”将停止下载并归入失败列表；已下载的部分会保留，随时可以重试。选择删除文件则连同临时数据一并清除。`
+    : it.status === "completed"
+      ? `“${it.filename}”将从 BaaDash 列表中移除；磁盘上的文件可选择一并删除。`
+      : `“${it.filename}”将从列表中移除；其未完成的临时数据可选择一并清除。`;
+  $("del-ok").textContent = live ? "取消下载" : "移除记录";
+  $("del-purge").textContent = live ? "取消并删除文件" : "移除并删除文件";
   dlg.returnValue = "";
   dlg.onclose = () => {
-    if (dlg.returnValue !== "ok") return;
-    call("remove", { ids: [it.id], deleteFiles: $("del-files").checked });
-    toast(live ? "已取消下载" : "已从列表中移除", "ok");
+    if (dlg.returnValue === "ok") {
+      if (live) call("cancel", { ids: [it.id] });
+      else call("remove", { ids: [it.id], deleteFiles: false });
+      toast(live ? "已取消下载，可随时重试" : "已从列表中移除", "ok");
+    } else if (dlg.returnValue === "purge") {
+      call("remove", { ids: [it.id], deleteFiles: true });
+      toast("已移除并删除文件", "ok");
+    }
   };
   dlg.showModal();
 }
@@ -2221,31 +2225,28 @@ function askBulk(ids: number[], historyOnly = false) {
   $("del-title").textContent = historyOnly
     ? "清理这些历史记录？"
     : live
-      ? "取消并移除所选任务？"
+      ? "取消所选任务？"
       : "移除所选记录？";
   $("del-text").textContent = live
-    ? `将取消 ${picked.length} 个所选任务，未完成的临时数据会被删除。已完成的文件保留。`
-    : `将清理 ${picked.length} 条记录。默认保留已下载文件及失败任务的临时数据。`;
-  $("del-ok").textContent = live ? "取消并移除" : "清理记录";
-  $("del-files-row").hidden = live;
-  $("del-files").checked = false;
-  const label = $("del-files-row").querySelector("span");
-  if (label) label.textContent = "同时删除所选记录的文件及临时数据";
+    ? `将取消 ${picked.length} 个所选任务并归入失败列表，已下载的部分保留，可随时重试。选择删除文件则连同临时数据一并清除。`
+    : `将清理 ${picked.length} 条记录；选择删除文件则连同已下载文件及临时数据一并清除。`;
+  $("del-ok").textContent = live ? "取消所选" : "清理记录";
+  $("del-purge").textContent = live ? "取消并删除文件" : "清理并删除文件";
   dlg.returnValue = "";
   dlg.onclose = async () => {
-    if (dlg.returnValue !== "ok") return;
+    const purge = dlg.returnValue === "purge";
+    if (dlg.returnValue !== "ok" && !purge) return;
     try {
-      if (live) await call("remove", { ids, deleteFiles: false });
-      else
-        await call("clear_history", {
-          ids,
-          deleteFiles: $("del-files").checked,
-          deleteTemp: $("del-files").checked,
-        });
+      if (live) {
+        if (purge) await call("remove", { ids, deleteFiles: true });
+        else await call("cancel", { ids });
+      } else {
+        await call("clear_history", { ids, deleteFiles: purge, deleteTemp: purge });
+      }
       ingest((await invoke("get_state")).items);
       bulkIds.clear();
       render();
-      toast("已处理所选记录", "ok");
+      toast(purge ? "已处理并删除文件" : "已处理所选记录", "ok");
     } catch {}
   };
   dlg.showModal();

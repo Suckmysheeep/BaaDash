@@ -26,8 +26,8 @@ export function renderMatrix(items: Item[], selected: number | null): number | n
   return item?.id ?? null;
 }
 
-/** Stable file identity, including extension; escaped before entering markup. */
+/** Stable file identity; escaped before entering markup. The name itself
+ * carries the extension, so a separate badge would only repeat it. */
 export function taskName(item: Item): string {
-  const extension = (/\.([^.]*)$/.exec(item.filename) || [])[1];
-  return `<span class="r-name" title="${esc(item.filename)}">${esc(item.filename)}</span>${extension ? `<span class="r-ext">${esc(extension.toUpperCase())}</span>` : ''}`;
+  return `<span class="r-name" title="${esc(item.filename)}">${esc(item.filename)}</span>`;
 }

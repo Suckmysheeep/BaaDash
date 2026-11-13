@@ -87,8 +87,17 @@ export const speed = (b: number): string => (b > 0 ? `${bytes(b)}/s` : "—");
 export function dur(sec: number): string {
   if (!isFinite(sec) || sec <= 0) return "—";
   sec = Math.ceil(sec);
-  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
-  return h ? `${h} 小时 ${m} 分` : m ? `${m} 分 ${s} 秒` : `${s} 秒`;
+  // Nobody reads "238471 小时": past two days the estimate is approximate,
+  // past a month it is a shrug (the status line already says the speed).
+  if (sec < 3600) {
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m ? `${m} 分 ${s} 秒` : `${s} 秒`;
+  }
+  const h = sec / 3600;
+  if (h < 48) return `约 ${Math.round(h)} 小时`;
+  const d = h / 24;
+  if (d <= 30) return `约 ${Math.round(d)} 天`;
+  return "超过 30 天";
 }
 /** A short relative time in Simplified Chinese. */
 export function when(ms: number | null | undefined): string {

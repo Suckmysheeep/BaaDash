@@ -4,4 +4,4 @@ BaaDash 是免费、开源的桌面下载管理器，支持多连接下载、断
 
 面向 Windows、macOS 和 Linux，基于 Rust 与 Tauri。BaaDash 由此前的中文分支项目独立发展而来，保留上游 SwiftDL 归属。
 
-当前为 BaaDash v0.5.5，采用石墨黑工作区、品牌荧光绿、专业数据表、真实传输可视化及原生窗口圆角，由 GitHub Actions 构建三平台安装包与浏览器扩展。
+当前为 BaaDash v0.6.0，采用石墨黑工作区、品牌荧光绿、专业数据表、真实传输可视化及原生窗口圆角，由 GitHub Actions 构建三平台安装包与浏览器扩展。

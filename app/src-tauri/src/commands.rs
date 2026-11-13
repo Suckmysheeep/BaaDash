@@ -123,6 +123,13 @@ pub fn resume(m: Mgr, ids: Vec<u64>) {
     m.resume(&ids);
 }
 
+/// Stops downloads and moves them to the failed list ("已取消"), keeping
+/// partial data for a retry.
+#[tauri::command]
+pub fn cancel(m: Mgr, ids: Vec<u64>) {
+    m.cancel(&ids);
+}
+
 #[tauri::command]
 pub fn clear_history(m: Mgr, ids: Vec<u64>, delete_files: bool, delete_temp: bool) -> Result<(), String> {
     m.clear_history(&ids, delete_files, delete_temp).map_err(|e|e.to_string())

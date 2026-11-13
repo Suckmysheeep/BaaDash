@@ -60,7 +60,6 @@ try {
   results.push("Select-all and exit selection");
   await page.locator('[data-view="completed"]').click();
   await page.locator("#btn-history").click();
-  assert.equal(await page.locator("#del-files").isChecked(), false);
   await page.locator("#del-ok").click();
   await page.waitForFunction(async () => {
     const state = await window.__TAURI__.core.invoke("get_state");

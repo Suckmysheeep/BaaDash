@@ -311,6 +311,14 @@ declare global {
           i.status = "paused";
           i.speed = 0;
         }),
+    cancel: ({ ids }) =>
+      items
+        .filter((i) => ids.includes(i.id) && !["completed", "error"].includes(i.status))
+        .forEach((i) => {
+          i.status = "error";
+          i.error = "已取消";
+          i.speed = 0;
+        }),
     resume: ({ ids }) => {
       items
         .filter(

@@ -68,6 +68,11 @@ body.dlw #view{overflow:auto;padding-bottom:18px}
 .t-file input { accent-color: var(--accent); margin: 0; }
 .t-allrow { font-weight: 600; border-bottom: 1px solid var(--border); border-radius: 7px 7px 0 0; margin-bottom: 2px; }
 .t-wait { display: flex; align-items: center; gap: 10px; padding: 18px 12px; font-size: 13px; }
+.btn.danger.armed { background: var(--red); color: #fff; border-color: transparent; }
+.t-hint { width: 100%; border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); background: color-mix(in srgb, var(--amber) 9%, transparent); border-radius: 10px; padding: 12px 14px; font-size: 12px; }
+.t-hint b { display: block; font-size: 13px; margin-bottom: 4px; color: var(--amber); }
+.t-hint p { margin: 0 0 10px; color: var(--text-2); line-height: 1.5; }
+.t-hint-actions { display: flex; gap: 8px; margin-bottom: 8px; }
 
 .add-err { margin: 16px 0 -6px; font-size: 13px; }
 

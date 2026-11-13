@@ -68,6 +68,10 @@ pub struct Item {
     /// presence marks the download as a torrent.
     #[serde(default)]
     pub torrent_files: Option<Vec<usize>>,
+    /// A torrent's payload paths, relative to its download folder, so
+    /// "delete files" can clean up after it.
+    #[serde(default)]
+    pub torrent_paths: Option<Vec<String>>,
     /// Live status text, such as "Merging video and audio".
     #[serde(default, skip_deserializing)]
     pub note: Option<String>,
@@ -178,6 +182,9 @@ pub struct AddRequest {
     /// A torrent: the files to download (see `Item::torrent_files`).
     #[serde(default)]
     pub torrent_files: Option<Vec<usize>>,
+    /// A torrent's payload paths, relative to `dir` (for "delete files").
+    #[serde(default)]
+    pub torrent_paths: Option<Vec<String>>,
     #[serde(default)]
     pub background: bool,
     #[serde(default)]
@@ -192,6 +199,13 @@ struct Running {
     /// Shared with a torrent job: cleared on deletion so its pause removes
     /// the engine task instead of keeping it warm.
     warm_pause: Arc<AtomicBool>,
+    /// Set by `cancel`: the task ends as failed ("已取消"), not paused.
+    cancelled: AtomicBool,
+    /// Set when a running task is removed with its files: the partial
+    /// payload is deleted once the engine has let go of it.
+    purge: AtomicBool,
+    /// A torrent's payload, relative to its download folder (for purge).
+    torrent_paths: Vec<String>,
     progress: Arc<Progress>,
     last: (u64, Instant),
     speed: f64,
@@ -209,6 +223,10 @@ struct Inner {
     next_confirm: u64,
     /// Download id -> label of the window showing its progress.
     windows: HashMap<u64, String>,
+    /// Tasks started from a New download window get no automatic progress
+    /// window (that window was already their confirmation UI, and it closes
+    /// on start).
+    suppress_progress: std::collections::HashSet<u64>,
     next_id: u64,
     dirty: bool,
 }
@@ -257,6 +275,7 @@ impl DownloadManager {
                 probe_cancels: HashMap::new(),
                 next_confirm: 1,
                 windows: HashMap::new(),
+                suppress_progress: std::collections::HashSet::new(),
                 next_id,
                 dirty: false,
             }),
@@ -327,13 +346,14 @@ impl DownloadManager {
                 connections: 0,
                 format: req.format,
                 torrent_files: req.torrent_files,
+                torrent_paths: req.torrent_paths,
                 note: None,
                 background: req.background,
                 convert_gif: req.convert_gif,
                 gif_options: req.gif_options,
             });
-            if let Some(label) = req.window {
-                g.windows.insert(id, label);
+            if req.window.is_some() {
+                g.suppress_progress.insert(id);
             }
             id
         };
@@ -398,6 +418,37 @@ impl DownloadManager {
         self.changed();
     }
 
+    /// Cancels downloads: they stop and land in the failed list as
+    /// "已取消", keeping their partial data so a retry picks up where they
+    /// stopped. (Deleting the record and the files is `remove`'s job.)
+    pub fn cancel(self: &Arc<Self>, ids: &[u64]) {
+        let mut paused = vec![];
+        {
+            let mut g = self.inner.lock().unwrap();
+            for id in ids {
+                if let Some(r) = g.running.get(id) {
+                    r.cancelled.store(true, Ordering::Relaxed);
+                    // A cancel is not a pause: a torrent leaves the engine.
+                    r.warm_pause.store(false, Ordering::Relaxed);
+                    r.cancel.cancel();
+                } else if let Some(item) = g.items.iter_mut().find(|i| i.id == *id && matches!(i.status, Status::Queued | Status::Paused)) {
+                    item.status = Status::Error;
+                    item.error = Some("已取消".into());
+                    paused.push(item.url.clone());
+                }
+            }
+            if !paused.is_empty() {
+                g.dirty = true;
+            }
+        }
+        // A paused torrent still sits in the engine; a cancelled one must not.
+        for url in paused {
+            crate::torrent::drop_paused(url.trim());
+        }
+        self.changed();
+        self.save();
+    }
+
     pub fn resume(self: &Arc<Self>, ids: &[u64]) {
         {
             let mut g = self.inner.lock().unwrap();
@@ -417,6 +468,10 @@ impl DownloadManager {
             let mut g = self.inner.lock().unwrap();
             for id in ids {
                 if let Some(r) = g.running.get(id) {
+                    // The partial payload goes once the engine lets go of it.
+                    if delete_files {
+                        r.purge.store(true, Ordering::Relaxed);
+                    }
                     r.warm_pause.store(false, Ordering::Relaxed);
                     r.cancel.cancel();
                 }
@@ -432,8 +487,14 @@ impl DownloadManager {
             if item.status != Status::Downloading {
                 remove_temp_files(&item.path);
             }
-            if delete_files && item.status == Status::Completed {
+            if delete_files {
+                // A torrent's payload (partial or complete) is the files it
+                // held, under its download folder.
+                if let (Some(rel), Some(dir)) = (&item.torrent_paths, item.path.parent()) {
+                    remove_torrent_payload(dir, rel);
+                }
                 let _ = std::fs::remove_file(&item.path);
+                let _ = std::fs::remove_dir(&item.path); // a torrent's root folder, once empty
             }
         }
         self.changed();
@@ -511,7 +572,7 @@ impl DownloadManager {
             }
             let filename = inc.suggested_name().or(probed.map(|r| r.filename)).unwrap_or_else(|| "download.bin".into());
             let dir = this.default_dir(category_for(&filename));
-            this.add(AddRequest { checksum: None, url: inc.url, filename, dir, headers, start: true, window: None, format: None, size: None, torrent_files: None, background: false, convert_gif: false, gif_options: None });
+            this.add(AddRequest { checksum: None, url: inc.url, filename, dir, headers, start: true, window: None, format: None, size: None, torrent_files: None, torrent_paths: None, background: false, convert_gif: false, gif_options: None });
         });
     }
 
@@ -560,6 +621,7 @@ impl DownloadManager {
                     format: media.then(|| "bv*+ba/b".into()),
                     size: None,
                     torrent_files: None,
+                    torrent_paths: None,
                     background: true,
                     convert_gif: inc.convert_gif,
                     gif_options: inc.gif_options,
@@ -629,6 +691,7 @@ impl DownloadManager {
             if !g.settings.show_progress_window {
                 return;
             }
+            let ids: Vec<u64> = ids.iter().copied().filter(|id| !g.suppress_progress.remove(id)).collect();
             let missing: Vec<u64> = ids
                 .iter()
                 .copied()
@@ -685,6 +748,9 @@ impl DownloadManager {
                             path: item.path.clone(),
                             cancel: cancel.clone(),
                             warm_pause,
+                            cancelled: AtomicBool::new(false),
+                            purge: AtomicBool::new(false),
+                            torrent_paths: item.torrent_paths.clone().unwrap_or_default(),
                             progress: progress.clone(),
                             last: (item.downloaded, Instant::now()),
                             speed: 0.0,
@@ -847,6 +913,13 @@ impl DownloadManager {
                     // Removed while running: drop what it left behind.
                     if let Some(r) = &running {
                         remove_temp_files(&r.path);
+                        if r.purge.load(Ordering::Relaxed) {
+                            if let Some(dir) = r.path.parent() {
+                                remove_torrent_payload(dir, &r.torrent_paths);
+                            }
+                            let _ = std::fs::remove_file(&r.path);
+                            let _ = std::fs::remove_dir(&r.path);
+                        }
                     }
                 }
                 Some(item) => {
@@ -877,7 +950,14 @@ impl DownloadManager {
                             }
                         }
                         Ok(Outcome::Paused) => {
-                            item.status = Status::Paused;
+                            // A cancelled task is a stopped one: it lands in
+                            // the failed list, its partial data kept for retry.
+                            if running.as_ref().is_some_and(|r| r.cancelled.load(Ordering::Relaxed)) {
+                                item.status = Status::Error;
+                                item.error = Some("已取消".into());
+                            } else {
+                                item.status = Status::Paused;
+                            }
                             // A plain download from a server without range
                             // support cannot resume: its partial file would
                             // only take up disk and show as progress the next
@@ -1034,6 +1114,26 @@ pub fn category_for(filename: &str) -> &'static str {
         "exe" | "msi" | "dmg" | "pkg" | "deb" | "rpm" | "apk" | "appimage" | "msix" | "bat" | "jar" => "Programs",
         "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "heic" | "avif" => "Images",
         _ => "Other",
+    }
+}
+
+/// Deletes a torrent's payload — the files it downloaded, partial or
+/// not — and prunes folders that leaves empty, never touching anything
+/// above `dir` or outside it.
+fn remove_torrent_payload(dir: &Path, rel: &[String]) {
+    for r in rel {
+        let p = dir.join(r);
+        if !p.starts_with(dir) {
+            continue;
+        }
+        let _ = std::fs::remove_file(&p);
+        let mut up = p.parent();
+        while let Some(d) = up {
+            if d == dir || std::fs::remove_dir(d).is_err() {
+                break;
+            }
+            up = d.parent();
+        }
     }
 }
 

@@ -123,9 +123,9 @@ async function confirmView(token: number) {
     const id = await addDownload({ checksum, url: inc.url, filename, dir, headers, start, window: win?.label });
     if (id == null) return;
     invoke("forget_confirm", { token });
-    if (!start) { $("w-close").click(); return; }
-    history.replaceState(null, "", `?id=${id}`);
-    progressView(id);
+    // Starting hands the task to the main window's list, so this window's
+    // job is done either way; progress is one click away on the task's row.
+    $("w-close").click();
   };
   $("c-later").onclick = () => add(false);
   $("c-start").onclick = () => add(true);
@@ -210,9 +210,9 @@ async function mediaView(token: number, inc: Incoming, settings: Settings, heade
     const id = await addDownload({ url: inc.url, filename, dir, headers, start, window: win?.label, format: q.format, size: q.size ?? null });
     if (id == null) return;
     invoke("forget_confirm", { token });
-    if (!start) { $("w-close").click(); return; }
-    history.replaceState(null, "", `?id=${id}`);
-    progressView(id);
+    // Starting hands the task to the main window's list, so this window's
+    // job is done either way; progress is one click away on the task's row.
+    $("w-close").click();
   };
   $("c-later").onclick = () => add(false);
   $("c-start").onclick = () => add(true);
@@ -259,9 +259,23 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
       row.hidden = !!(chip && row.dataset.cat !== chip) || !!(query && !row.dataset.name!.includes(query));
     });
   };
-  let elapsed = 0, timer = 0;
+  let elapsed = 0, timer = 0, hintDismissed = false;
   const waitMsg = () => (magnet ? `正在寻找分享此资源的节点… 已等待 ${elapsed} 秒` : "正在读取文件列表…") +
     (magnet && elapsed >= 60 ? "（长时间无节点应答：可能是死种或当前网络限制了 BT 流量，可以取消）" : magnet && elapsed >= 20 ? "（节点较少时可能更久，可随时取消）" : "");
+  // The waiting area: a quiet spinner at first, then — after 10 s on a
+  // magnet — an amber card asking whether to keep waiting. Whenever the
+  // probe answers, fill()/the error view replaces this whole block, card
+  // included, so a late success never leaves a stale prompt behind.
+  const renderWait = () => {
+    const card = magnet && elapsed >= 10 && !hintDismissed;
+    $("t-files").innerHTML = card
+      ? `<div class="t-wait"><div class="t-hint"><b>这个种子应答很慢</b><p>可能是死种，或现在做种的人太少。可以继续等，也可以取消后换一个来源。</p><div class="t-hint-actions"><button class="btn sm" id="t-wait-more">继续等待</button><button class="btn sm danger" id="t-give-up">取消</button></div><span class="muted" id="t-wait-msg">${waitMsg()}</span></div></div>`
+      : `<div class="t-wait"><span class="spinner"></span><span class="muted" id="t-wait-msg">${waitMsg()}</span></div>`;
+    if (card) {
+      $("t-wait-more").onclick = () => { hintDismissed = true; renderWait(); };
+      $("t-give-up").onclick = () => $("c-cancel").click();
+    }
+  };
   const fill = () => {
     $("c-name").value = info!.name;
     const files = info!.files;
@@ -295,10 +309,15 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
   };
   const probe = async () => {
     elapsed = 0;
+    hintDismissed = false;
     $("c-start").disabled = $("c-later").disabled = true;
-    $("t-files").innerHTML = `<div class="t-wait"><span class="spinner"></span><span class="muted" id="t-wait-msg">${waitMsg()}</span></div>`;
+    renderWait();
     clearInterval(timer);
-    timer = window.setInterval(() => { elapsed++; const m = $("t-wait-msg"); if (m) m.textContent = waitMsg(); }, 1000);
+    timer = window.setInterval(() => {
+      elapsed++;
+      if (magnet && elapsed === 10 && !hintDismissed) renderWait();
+      else { const m = $("t-wait-msg"); if (m) m.textContent = waitMsg(); }
+    }, 1000);
     // The backend gives up on its own after 90 s; if even that answer never
     // arrives (a stalled engine must never turn this window into a trap),
     // recover locally so cancel and retry keep working.
@@ -328,21 +347,21 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
     if ((e.target as HTMLElement & HTMLInputElement).id === "t-all") view.querySelectorAll<HTMLInputElement>(".t-file input[data-i]").forEach((c) => (c.checked = (e.target as HTMLElement & HTMLInputElement).checked));
     update();
   });
+  $("c-cancel").onclick = () => { invoke("forget_confirm", { token }); $("w-close").click(); };
   await probe();
   $("c-browse").onclick = async () => { const d = await invoke("pick_folder", { start: dir }); if (d) setDir(d); };
-  $("c-cancel").onclick = () => { invoke("forget_confirm", { token }); $("w-close").click(); };
   const add = async (start: boolean) => {
     if (!info) return;
     const sel = chosen();
     if (!sel.length) return;
     const files = sel.length === info.files.length ? [] : sel;
     const size = sel.reduce((a, i) => a + info!.files[i].size, 0);
-    const id = await addDownload({ url: inc.url, filename: $("c-name").value.trim() || info.name, dir, headers, start, window: win?.label, size, torrentFiles: files });
+    const id = await addDownload({ url: inc.url, filename: $("c-name").value.trim() || info.name, dir, headers, start, window: win?.label, size, torrentFiles: files, torrentPaths: sel.map((i) => info!.files[i].path) });
     if (id == null) return;
     invoke("forget_confirm", { token });
-    if (!start) { $("w-close").click(); return; }
-    history.replaceState(null, "", `?id=${id}`);
-    progressView(id);
+    // Starting hands the task to the main window's list, so this window's
+    // job is done either way; progress is one click away on the task's row.
+    $("w-close").click();
   };
   $("c-later").onclick = () => add(false);
   $("c-start").onclick = () => add(true);
@@ -383,8 +402,8 @@ function render() {
   if (layout !== key) {
     layout = key;
     const buttons = {
-      run: `<button class="btn" data-a="cancel">取消</button><button class="btn" data-a="pause">暂停</button>`,
-      paused: `<button class="btn" data-a="cancel">取消</button><button class="btn primary" data-a="resume">继续</button>`,
+      run: `<button class="btn danger" data-a="cancel-del">取消并删除文件</button><button class="btn" data-a="cancel">取消</button><button class="btn" data-a="pause">暂停</button>`,
+      paused: `<button class="btn danger" data-a="cancel-del">取消并删除文件</button><button class="btn" data-a="cancel">取消</button><button class="btn primary" data-a="resume">继续</button>`,
       done: `<button class="btn" data-a="folder">在文件夹中显示</button><button class="btn" data-a="close">关闭</button><button class="btn primary" data-a="open">打开</button>`,
       error: `<button class="btn" data-a="close">关闭</button><button class="btn primary" data-a="resume">重试</button>`,
     }[state];
@@ -454,14 +473,19 @@ view.addEventListener("click", async (e) => {
     case "folder": invoke("open_folder", { id }); break;
     case "close": $("w-close").click(); break;
     case "cancel":
-      // Ask twice instead of a second dialog: the button arms for 3 s.
+      // Stops and lands in the failed list ("已取消"), partial data kept;
+      // the listener re-renders this window as an error, with a retry.
+      await invoke("cancel", { ids: [id] });
+      break;
+    case "cancel-del":
+      // The destructive one asks twice: the button arms for 3 s.
       if (!b.classList.contains("armed")) {
-        b.classList.add("armed"); b.textContent = "确认取消下载？";
+        b.classList.add("armed"); b.textContent = "确认删除文件？";
         clearTimeout(armedTimer);
-        armedTimer = window.setTimeout(() => { b.classList.remove("armed"); b.textContent = "取消"; }, 3000);
+        armedTimer = window.setTimeout(() => { b.classList.remove("armed"); b.textContent = "取消并删除文件"; }, 3000);
       } else {
-        await invoke("remove", { ids: [id], deleteFiles: false });
-        $("w-close").click();
+        // The record and its files go; the listener closes this window.
+        await invoke("remove", { ids: [id], deleteFiles: true });
       }
       break;
   }
