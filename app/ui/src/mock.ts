@@ -35,6 +35,7 @@ declare global {
     theme: "system",
     accentColor: "#e3fa61",
     seedUntil: "stop",
+    autoTrackers: true,
   };
   if (VIDEO)
     Object.assign(settings, {

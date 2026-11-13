@@ -260,7 +260,8 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
     });
   };
   let elapsed = 0, timer = 0;
-  const waitMsg = () => (magnet ? `正在寻找分享此资源的节点… 已等待 ${elapsed} 秒` : "正在读取文件列表…") + (magnet && elapsed >= 20 ? "（节点较少时可能更久，可随时取消）" : "");
+  const waitMsg = () => (magnet ? `正在寻找分享此资源的节点… 已等待 ${elapsed} 秒` : "正在读取文件列表…") +
+    (magnet && elapsed >= 60 ? "（长时间无节点应答：可能是死种或当前网络限制了 BT 流量，可以取消）" : magnet && elapsed >= 20 ? "（节点较少时可能更久，可随时取消）" : "");
   const fill = () => {
     $("c-name").value = info!.name;
     const files = info!.files;
@@ -280,6 +281,7 @@ async function torrentView(token: number, inc: Incoming, settings: Settings, hea
       <span class="k">资源</span><span class="v"><span>${files.length} 个文件 · ${bytes(info!.size)}</span></span>
       <span class="k">哈希</span><span class="v"><span title="${info!.hash}">${info!.hash.slice(0, 16)}…</span><button class="btn sm" id="t-copy">复制</button></span>
       ${magnet ? `<span class="k">节点</span><span class="v"><span>已发现 ${info!.peers} 个</span></span>` : ""}
+      ${magnet && info!.peers === 0 ? `<span class="k">提醒</span><span class="v"><span class="err">没有找到任何节点：种子信息来自缓存站，下载可能长期没有速度</span></span>` : ""}
       <span class="k">来源</span><span class="v"><span title="${esc(inc.url)}">${esc(src)}</span></span>`);
     $("t-copy").onclick = async (e) => { await navigator.clipboard.writeText(info!.hash).catch(() => {}); (e.currentTarget as HTMLElement).textContent = "已复制"; };
     $("t-q")?.addEventListener("input", () => { query = ($("t-q") as HTMLInputElement).value.trim().toLowerCase(); filterRows(); });

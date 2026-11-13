@@ -61,6 +61,7 @@ export interface Settings {
   closeToTray: boolean;
   theme: "system" | "light" | "dark" | string;
   seedUntil: "stop" | "1" | "2" | "forever" | string;
+  autoTrackers: boolean;
 }
 
 export interface Incoming {

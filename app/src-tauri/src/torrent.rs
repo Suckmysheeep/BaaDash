@@ -7,7 +7,7 @@
 //! the computer's handler for magnet links and .torrent files.
 
 use anyhow::{Context, Result, anyhow, bail};
-use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, DhtSessionConfig, Session, SessionOptions};
+use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, DhtSessionConfig, ListenerOptions, Session, SessionOptions};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -43,6 +43,31 @@ fn magnet_trackers(url: &str) -> Option<Vec<String>> {
     (!trackers.is_empty()).then_some(trackers)
 }
 
+/// A magnet link's v1 info hash (its `xt=urn:btih:` parameter).
+fn magnet_hash(url: &str) -> Option<String> {
+    let query = url.trim().strip_prefix("magnet:")?.split(['?', '#']).nth(1)?;
+    let xt = url::form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "xt")?.1.into_owned();
+    let hash = xt.strip_prefix("urn:btih:")?;
+    (hash.len() == 40 && hash.bytes().all(|b| b.is_ascii_hexdigit())).then(|| hash.to_ascii_lowercase())
+}
+
+/// Public torrent caches keep .torrent files keyed by info hash. On networks
+/// where DHT is poisoned or filtered they answer in seconds while the swarm
+/// stays silent; the caller still verifies the hash of what comes back.
+async fn fetch_cached_metadata(client: &Client, hash: &str) -> Result<Vec<u8>> {
+    let url = format!("https://itorrents.net/torrent/{hash}.torrent");
+    let bytes = tokio::time::timeout(Duration::from_secs(20), async {
+        let resp = client.get(&url).send().await?.error_for_status()?;
+        resp.bytes().await
+    })
+    .await
+    .context("the metadata cache didn't answer")??;
+    if bytes.first() != Some(&b'd') || bytes.len() > 20 * 1024 * 1024 {
+        bail!("the metadata cache returned junk");
+    }
+    Ok(bytes.to_vec())
+}
+
 /// One BitTorrent session for the whole app, started on first use.
 static SESSION: OnceCell<Arc<Session>> = OnceCell::const_new();
 
@@ -66,7 +91,12 @@ async fn session() -> Result<Arc<Session>> {
                 bootstrap_addrs: Some(BOOTSTRAP.iter().map(|s| s.to_string()).collect()),
                 ..Default::default()
             };
-            let opts = SessionOptions { dht: Some(dht), ..Default::default() };
+            // Listen for incoming connections too, and ask the router to
+            // forward the port (UPnP). Without this the engine only ever
+            // dials out, which halves the reachable swarm — and on CGNAT
+            // networks incoming is often the only way to reach rare swarms.
+            let listen = ListenerOptions { enable_upnp_port_forwarding: true, ..Default::default() };
+            let opts = SessionOptions { dht: Some(dht), listen: Some(listen), ..Default::default() };
             let started = std::time::Instant::now();
             let session = tokio::time::timeout(Duration::from_secs(30), Session::new_with_opts(dir, opts))
                 .await
@@ -76,6 +106,56 @@ async fn session() -> Result<Arc<Session>> {
         })
         .await
         .cloned()
+}
+
+/// Public trackers give magnets far more peers than the link itself carries.
+/// The list is ngosang/trackerslist (a well-maintained best-of), with a
+/// jsDelivr mirror for networks that can't reach GitHub's raw domain.
+const TRACKER_SOURCES: [&str; 2] = [
+    "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt",
+    "https://cdn.jsdelivr.net/gh/ngosang/trackerslist@master/trackers_best.txt",
+];
+const TRACKER_TTL: Duration = Duration::from_secs(24 * 3600);
+
+static PUBLIC_TRACKERS: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Vec::new());
+
+fn public_trackers() -> Vec<String> {
+    PUBLIC_TRACKERS.read().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+/// Loads the cached tracker list, then refreshes it in the background when
+/// it's more than a day old. Called once at startup.
+pub async fn refresh_trackers(client: &Client, data_dir: &Path) {
+    let file = data_dir.join("trackers.txt");
+    if let Ok(text) = std::fs::read_to_string(&file) {
+        let list: Vec<String> = text.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_string).collect();
+        if !list.is_empty() {
+            *PUBLIC_TRACKERS.write().unwrap_or_else(|e| e.into_inner()) = list;
+        }
+    }
+    let fresh = std::fs::metadata(&file)
+        .and_then(|m| m.modified())
+        .map(|t| t.elapsed().unwrap_or_default() < TRACKER_TTL)
+        .unwrap_or(false);
+    if fresh {
+        return;
+    }
+    for url in TRACKER_SOURCES {
+        let fetched = async {
+            let resp = client.get(url).send().await?.error_for_status()?;
+            resp.text().await
+        };
+        if let Ok(Ok(text)) = tokio::time::timeout(Duration::from_secs(15), fetched).await {
+            let list: Vec<String> = text.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_string).collect();
+            if list.len() >= 10 {
+                crate::log::line(&format!("public tracker list updated: {} trackers", list.len()));
+                *PUBLIC_TRACKERS.write().unwrap_or_else(|e| e.into_inner()) = list.clone();
+                let _ = std::fs::write(&file, list.join("\n"));
+                return;
+            }
+        }
+    }
+    crate::log::line("could not refresh the public tracker list");
 }
 
 /// What to give the engine: magnets as they are; .torrent files are read
@@ -123,19 +203,21 @@ pub struct TorrentInfo {
 struct Probed {
     bytes: Vec<u8>,
     peers: Vec<std::net::SocketAddr>,
+    /// Private swarms (PT) must never see public trackers.
+    private: bool,
     at: std::time::Instant,
 }
 static PROBED: Mutex<Vec<(String, Probed)>> = Mutex::new(Vec::new());
 const PROBED_TTL: Duration = Duration::from_secs(15 * 60);
 
-fn keep_probed(url: &str, bytes: &[u8], peers: Vec<std::net::SocketAddr>) {
+fn keep_probed(url: &str, bytes: &[u8], peers: Vec<std::net::SocketAddr>, private: bool) {
     let mut g = PROBED.lock().unwrap();
     g.retain(|(_, p)| p.at.elapsed() < PROBED_TTL);
     g.retain(|(u, _)| u != url);
     if g.len() >= 8 {
         g.remove(0);
     }
-    g.push((url.to_string(), Probed { bytes: bytes.to_vec(), peers, at: std::time::Instant::now() }));
+    g.push((url.to_string(), Probed { bytes: bytes.to_vec(), peers, private, at: std::time::Instant::now() }));
 }
 
 fn take_probed(url: &str) -> Option<Probed> {
@@ -147,7 +229,7 @@ fn take_probed(url: &str) -> Option<Probed> {
 
 /// Reads a torrent's name and files without downloading it. For a magnet
 /// link this asks peers for the details first, which can take a moment.
-pub async fn probe(client: &Client, url: &str, headers: &HeaderMap, cancel: CancellationToken) -> Result<TorrentInfo> {
+pub async fn probe(client: &Client, url: &str, headers: &HeaderMap, cancel: CancellationToken, auto_trackers: bool) -> Result<TorrentInfo> {
     // Each stage goes to the log: if a probe ever hangs again, the last line
     // says exactly where it stopped.
     let short: String = url.trim().chars().take(80).collect();
@@ -158,19 +240,69 @@ pub async fn probe(client: &Client, url: &str, headers: &HeaderMap, cancel: Canc
         _ = cancel.cancelled() => { crate::log::line("torrent probe cancelled before the engine was up"); bail!("cancelled") }
     };
     let add = source(client, url, headers).await?;
-    let opts = AddTorrentOptions { list_only: true, ..Default::default() };
-    let resp = tokio::select! {
-        r = tokio::time::timeout(Duration::from_secs(90), session.add_torrent(add, Some(opts))) => {
-            match &r {
-                Ok(Ok(_)) => crate::log::line(&format!("torrent probe found peers in {:.1}s: {short}", started.elapsed().as_secs_f64())),
-                Ok(Err(e)) => crate::log::line(&format!("torrent probe failed in {:.1}s: {e:#}: {short}", started.elapsed().as_secs_f64())),
-                Err(_) => crate::log::line(&format!("torrent probe timed out after 90s: {short}")),
+    // Public trackers join a magnet's own: the more places we ask, the sooner
+    // someone answers. .torrent files keep their own trackers untouched.
+    let extra: Vec<String> = if auto_trackers && url.trim().starts_with("magnet:") { public_trackers() } else { vec![] };
+    let list_opts = || AddTorrentOptions { list_only: true, trackers: (!extra.is_empty()).then(|| extra.clone()), ..Default::default() };
+    // Two roads to a magnet's metadata race each other: the swarm
+    // (DHT/trackers) and public caches keyed by info hash. On networks where
+    // DHT is poisoned the cache answers in seconds.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(90);
+    let from_swarm = session.add_torrent(add, Some(list_opts()));
+    tokio::pin!(from_swarm);
+    let from_swarm_log = |r: &Result<Result<AddTorrentResponse>, tokio::time::error::Elapsed>| match r {
+        Ok(Ok(_)) => crate::log::line(&format!("torrent probe: swarm answered in {:.1}s: {short}", started.elapsed().as_secs_f64())),
+        Ok(Err(e)) => crate::log::line(&format!("torrent probe failed in {:.1}s: {e:#}: {short}", started.elapsed().as_secs_f64())),
+        Err(_) => crate::log::line(&format!("torrent probe timed out after 90s: {short}")),
+    };
+    let resp = if let Some(hash) = magnet_hash(url) {
+        let from_cache = fetch_cached_metadata(client, &hash);
+        tokio::pin!(from_cache);
+        tokio::select! {
+            r = tokio::time::timeout_at(deadline, &mut from_swarm) => {
+                from_swarm_log(&r);
+                r.map_err(|_| anyhow!("couldn't find anyone sharing this torrent"))??
             }
-            r.map_err(|_| anyhow!("couldn't find anyone sharing this torrent"))??
+            b = &mut from_cache => match b {
+                Ok(bytes) => {
+                    crate::log::line(&format!("torrent probe: metadata cache answered in {:.1}s: {short}", started.elapsed().as_secs_f64()));
+                    match session.add_torrent(AddTorrent::from_bytes(bytes), Some(list_opts())).await {
+                        Ok(resp @ AddTorrentResponse::ListOnly(_)) => resp,
+                        other => {
+                            let why = other.err().map(|e| format!("{e:#}")).unwrap_or_else(|| "unexpected answer".into());
+                            crate::log::line(&format!("torrent probe: cached metadata rejected ({why}); waiting on the swarm"));
+                            let r = tokio::time::timeout_at(deadline, &mut from_swarm).await;
+                            from_swarm_log(&r);
+                            r.map_err(|_| anyhow!("couldn't find anyone sharing this torrent"))??
+                        }
+                    }
+                }
+                Err(e) => {
+                    crate::log::line(&format!("torrent probe: no luck from the metadata cache ({e:#}); waiting on the swarm"));
+                    let r = tokio::time::timeout_at(deadline, &mut from_swarm).await;
+                    from_swarm_log(&r);
+                    r.map_err(|_| anyhow!("couldn't find anyone sharing this torrent"))??
+                }
+            },
+            _ = cancel.cancelled() => { crate::log::line(&format!("torrent probe cancelled after {:.1}s: {short}", started.elapsed().as_secs_f64())); bail!("cancelled") }
         }
-        _ = cancel.cancelled() => { crate::log::line(&format!("torrent probe cancelled after {:.1}s: {short}", started.elapsed().as_secs_f64())); bail!("cancelled") }
+    } else {
+        tokio::select! {
+            r = tokio::time::timeout_at(deadline, &mut from_swarm) => {
+                from_swarm_log(&r);
+                r.map_err(|_| anyhow!("couldn't find anyone sharing this torrent"))??
+            }
+            _ = cancel.cancelled() => { crate::log::line(&format!("torrent probe cancelled after {:.1}s: {short}", started.elapsed().as_secs_f64())); bail!("cancelled") }
+        }
     };
     let AddTorrentResponse::ListOnly(list) = resp else { bail!("unexpected answer from the torrent engine") };
+    // Whatever answered, the metadata must belong to the link asked about.
+    if let Some(h) = magnet_hash(url) {
+        if !list.info_hash.as_string().eq_ignore_ascii_case(&h) {
+            crate::log::line(&format!("torrent probe: metadata hash mismatch, rejected: {short}"));
+            bail!("the metadata found belongs to a different torrent");
+        }
+    }
     let info = &list.info;
     let name = info.name().map(|n| n.to_string()).unwrap_or_else(|| "torrent".into());
     let files: Vec<TorrentFile> = info
@@ -178,7 +310,8 @@ pub async fn probe(client: &Client, url: &str, headers: &HeaderMap, cancel: Canc
         .map(|f| TorrentFile { path: f.filename.to_pathbuf().to_string_lossy().replace('\\', "/"), size: f.len })
         .collect();
     let size = files.iter().map(|f| f.size).sum();
-    keep_probed(url.trim(), &list.torrent_bytes, list.seen_peers.clone());
+    let private = info.info().private;
+    keep_probed(url.trim(), &list.torrent_bytes, list.seen_peers.clone(), private);
     Ok(TorrentInfo { name, files, size, hash: list.info_hash.as_string(), peers: list.seen_peers.len() })
 }
 
@@ -213,6 +346,9 @@ pub struct Job {
     /// The global download speed limit as it stood when the job started
     /// (the engine's own limiter can't reach into the torrent session).
     pub limit_bps: Option<std::num::NonZeroU32>,
+    /// Settings > General: ask public trackers for more peers (never for
+    /// private swarms).
+    pub auto_trackers: bool,
 }
 
 /// Downloads a torrent, reporting into `progress` and `note`. Cancelling
@@ -228,20 +364,33 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
     // carry no trackers, so the magnet's own `tr=` list goes back in —
     // on networks where DHT is blocked those trackers are the only peers.
     let probed = take_probed(job.url.trim());
-    let (add, initial_peers, trackers) = match probed {
+    // Public trackers join in, except for private swarms (PT), where they
+    // must never be announced. Magnets are public by nature; for files the
+    // probe has already told us.
+    let private = probed.as_ref().is_some_and(|p| p.private);
+    let allow_public = job.auto_trackers && !private && (job.url.starts_with("magnet:") || probed.is_some());
+    let (add, initial_peers) = match probed {
         Some(p) => {
             set_note(Some("Starting".into()));
-            (AddTorrent::from_bytes(p.bytes), (!p.peers.is_empty()).then_some(p.peers), magnet_trackers(&job.url))
+            (AddTorrent::from_bytes(p.bytes), (!p.peers.is_empty()).then_some(p.peers))
         }
-        None => (source(client, &job.url, &job.headers).await?, None, None),
+        None => (source(client, &job.url, &job.headers).await?, None),
     };
+    let mut trackers = magnet_trackers(&job.url).unwrap_or_default();
+    if allow_public {
+        for t in public_trackers() {
+            if !trackers.contains(&t) {
+                trackers.push(t);
+            }
+        }
+    }
     let opts = AddTorrentOptions {
         output_folder: Some(job.dir.to_string_lossy().into_owned()),
         only_files: (!job.files.is_empty()).then(|| job.files.clone()),
         overwrite: true, // lets a paused torrent pick up the pieces already on disk
         ratelimits: librqbit::limits::LimitsConfig { upload_bps: None, download_bps: job.limit_bps },
         initial_peers,
-        trackers,
+        trackers: (!trackers.is_empty()).then_some(trackers),
         ..Default::default()
     };
     let handle = tokio::select! {
@@ -249,6 +398,7 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
         _ = cancel.cancelled() => { set_note(None); return Ok(Outcome::Paused); }
     };
 
+    let mut silent_since: Option<std::time::Instant> = None;
     let outcome = loop {
         let stats = handle.stats();
         if let Some(e) = &stats.error {
@@ -269,11 +419,22 @@ pub async fn run(client: &Client, job: Job, progress: Arc<Progress>, note: crate
                 let peers = live.snapshot.peer_stats.live;
                 let seeds = live.snapshot.peer_stats.live_seeders;
                 progress.connections.store(peers as usize, Ordering::Relaxed);
-                set_note(Some(match peers {
-                    0 => "Looking for peers".into(),
-                    1 => "Downloading from 1 peer".into(),
-                    n => format!("Downloading from {n} peers · {seeds} seeding"),
-                }));
+                if peers == 0 {
+                    // Say the quiet part out loud after a while: waiting
+                    // forever without a word is the worst BT experience.
+                    let silent = silent_since.get_or_insert_with(std::time::Instant::now);
+                    set_note(Some(if silent.elapsed() >= Duration::from_secs(300) {
+                        "找不到有文件的节点：这个种子可能已经没人分享了".into()
+                    } else {
+                        "Looking for peers".into()
+                    }));
+                } else {
+                    silent_since = None;
+                    set_note(Some(match peers {
+                        1 => "Downloading from 1 peer".into(),
+                        n => format!("Downloading from {n} peers · {seeds} seeding"),
+                    }));
+                }
             }
             None => set_note(Some("Checking existing pieces".into())),
         }
@@ -540,6 +701,16 @@ mod tests {
         assert_eq!(magnet_trackers("magnet:?xt=urn:btih:abc"), None);
         assert_eq!(magnet_trackers("https://example.com/f.torrent"), None);
     }
+
+    #[test]
+    fn pulls_the_hash_out_of_a_magnet() {
+        let h40 = "dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c";
+        assert_eq!(magnet_hash(&format!("magnet:?xt=urn:btih:{h40}&dn=Name")), Some(h40.to_string()));
+        assert_eq!(magnet_hash("magnet:?xt=urn:btih:DD8255ECDC7CA55FB0BBF81323D87062DB1F6D1C"), Some(h40.to_string()));
+        assert_eq!(magnet_hash("magnet:?xt=urn:btih:tooshort"), None);
+        assert_eq!(magnet_hash("magnet:?xt=urn:btmh:1220abcd"), None); // v2-only links have no v1 cache entry
+        assert_eq!(magnet_hash("https://example.com/f.torrent"), None);
+    }
 }
 
 /// Downloads from the real BitTorrent network for a while; run on demand:
@@ -554,13 +725,13 @@ mod live {
         tauri::async_runtime::block_on(async {
             let client = baadash_engine::build_client().unwrap();
             let url = "https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-desktop-amd64.iso.torrent";
-            let info = probe(&client, url, &HeaderMap::new(), CancellationToken::new()).await.unwrap();
+            let info = probe(&client, url, &HeaderMap::new(), CancellationToken::new(), true).await.unwrap();
             println!("{} · {} file(s) · {} bytes", info.name, info.files.len(), info.size);
             let progress = Arc::new(Progress::default());
             let note = crate::media::Note::default();
             let cancel = CancellationToken::new();
             let dir = std::env::temp_dir().join("baadash-torrent-test");
-            let job = Job { url: url.into(), headers: HeaderMap::new(), dir: dir.clone(), files: vec![], seed: Seed::Stop, limit_bps: None };
+            let job = Job { url: url.into(), headers: HeaderMap::new(), dir: dir.clone(), files: vec![], seed: Seed::Stop, limit_bps: None, auto_trackers: true };
             let (p, n, c) = (progress.clone(), note.clone(), cancel.clone());
             let watch = tauri::async_runtime::spawn(async move {
                 for s in 0..30 {

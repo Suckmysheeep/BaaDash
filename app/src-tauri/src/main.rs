@@ -99,6 +99,13 @@ fn main() {
                 crate::log::line(&format!("could not offer the browser extension: {e:#}"));
             }
             app.manage(mgr.clone());
+            {
+                // Public trackers for magnets and public swarms: refresh the
+                // list in the background; the cached one works until then.
+                let client = mgr.client().clone();
+                let dir = data_dir.clone();
+                tauri::async_runtime::spawn(async move { torrent::refresh_trackers(&client, &dir).await });
+            }
             if let Some(main) = app.get_webview_window("main") {
                 windows::polish(&main);
             }

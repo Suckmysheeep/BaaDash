@@ -1863,6 +1863,7 @@ function openSettings(tab = "general") {
   renderThemeChoice();
   setSeed = s.seedUntil || "stop";
   renderSeed();
+  $("set-auto-trackers").checked = s.autoTrackers !== false;
   setDir = s.downloadDir;
   $("set-dir").textContent = setDir;
   $("set-sort").checked = s.sortIntoCategories;
@@ -2005,6 +2006,7 @@ async function submitSettingsDraft():Promise<boolean> {
     interfaceDensity: setDensity,
     reduceMotion: $("set-reduce-motion").checked,
     seedUntil: setSeed,
+    autoTrackers: $("set-auto-trackers").checked,
   }); } catch { return false; } // The toast explains the failure; keep the draft open.
   $("dlg-settings").close();
   toast("设置已保存", "ok");

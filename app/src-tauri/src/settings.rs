@@ -33,6 +33,9 @@ pub struct Settings {
     /// After a torrent finishes: "stop", a share ratio such as "1" or "2",
     /// or "forever".
     pub seed_until: String,
+    /// Ask public trackers for more peers on public swarms (Settings >
+    /// General). Private swarms are always left alone.
+    pub auto_trackers: bool,
     pub proxy: String,
     pub bind_address: String,
     pub interface_scale: u32,
@@ -60,6 +63,7 @@ impl Default for Settings {
             interface_density: "compact".into(),
             reduce_motion: false,
             seed_until: "stop".into(),
+            auto_trackers: true,
             proxy: String::new(),
             bind_address: String::new(),
             interface_scale: 100,

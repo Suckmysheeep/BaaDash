@@ -29,23 +29,18 @@
     <main class="document">
       <div class="eyebrow">CHANGELOG</div>
       <h1>每一次更新，都有记录。</h1>
-      <p class="lede">v0.5.3 · 2026-11-13</p>
+      <p class="lede">v0.5.4 · 2026-11-13</p>
       <section class="section">
         <h2>修复与交互</h2>
         <ul>
-        <li>修复浏览器接管下载时把种子存成网页文件（如 attach-download-10.htm）的问题：不少站点的种子链接以 .htm 结尾、真实类型只写在响应头里。现在探测会依据响应的真实文件名与 Content-Type 识别种子，自动切换为种子视图（可选文件、显示哈希与节点数），不再把网页或种子原样存盘。</li>
-        <li>新增拖放打开：把 .torrent 文件拖到 BaaDash 任意窗口即打开新建任务窗口，与双击种子文件效果一致。</li>
-        <li>磁力链接在部分网络下长期找不到节点：DHT 引导节点从引擎内置的 2 个扩展到 5 个（增加 router.bittorrent.com、router.utorrent.com、dht.aelitis.com），在 DNS 污染或 UDP 受限的网络中明显提高磁力解析成功率；复用探测缓存启动下载时，磁力链接自带的 tracker 列表不再丢失。</li>
-        <li>新建任务窗口增加前端看门狗：即使下载引擎异常无响应，窗口也会在约 105 秒后自行恢复到可重试、可取消的状态——任何情况下窗口都关得掉。</li>
-        <li>同一链接重复点击不再叠出多个新建任务窗口，已有窗口自动置顶。</li>
-        <li>磁力链接带有 dn= 名称参数时，探测期间先行显示该名称。</li>
-        <li>扩展：.torrent 文件不再被「最小文件体积」设置拦截。</li>
+        <li>BT 内核强化（参考 koi-bt 等成熟产品的做法）：</li>
+        <li>引擎现在监听入站连接并通过 UPnP 自动映射端口——此前只拨出、别人永远连不进来，冷门资源可连节点少一半。</li>
+        <li>磁力探测双路竞速：向节点查询元数据的同时，按资源哈希并行请求公共种子缓存站并校验哈希，谁先答用谁——DHT 被污染或受限的网络里，磁力解析从约 90 秒缩短到几秒。</li>
+        <li>自动补充公共 tracker（ngosang/trackerslist 每日更新、本地缓存、含国内可达镜像）：磁力解析与下载都会询问更多节点。私有种子（PT）绝不注入。设置 → 通用中可关闭。</li>
+        <li>死种早提示：磁力探测 60 秒无节点应答时明确提示可能是死种或网络受限；下载中连续 5 分钟零节点时说明「这个种子可能已经没人分享了」，不再无解释地空等。</li>
+        <li>种子信息来自缓存站且节点为零时，新建任务窗口提示「下载可能长期没有速度」。</li>
         </ul>
-        <h2>可观测性</h2>
-        <ul>
-        <li>磁力探测全程写入日志（开始、引擎就绪耗时、寻点结果／超时／取消），新建窗口的打开与中途取消也有记录：再次遇到异常时，设置 → 关于里的日志能直接指出停在哪一环。</li>
-        </ul>
-        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.3">查看此版本 ↗</a>
+        <p><a class="button" href="https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.4">查看此版本 ↗</a>
         <a class="button" href="https://github.com/Suckmysheeep/BaaDash/blob/main/CHANGELOG.md">完整历史记录 ↗</a></p>
       </section>
     </main>

@@ -723,7 +723,7 @@ impl DownloadManager {
                         let dir = req.dest.parent().map(Path::to_path_buf).unwrap_or_default();
                         let seed = crate::torrent::Seed::from_setting(&this.settings().seed_until);
                         let limit = if this.ignore_limit.load(Ordering::Relaxed) { 0 } else { this.settings().speed_limit_kib.saturating_mul(1024) };
-                        let job = crate::torrent::Job { url: req.url.clone(), headers: req.headers.clone(), dir, files, seed, limit_bps: std::num::NonZeroU32::new(limit.min(u32::MAX as u64) as u32) };
+                        let job = crate::torrent::Job { url: req.url.clone(), headers: req.headers.clone(), dir, files, seed, limit_bps: std::num::NonZeroU32::new(limit.min(u32::MAX as u64) as u32), auto_trackers: this.settings().auto_trackers };
                         crate::torrent::run(&this.client, job, progress, note.clone(), cancel).await
                     }
                     Kind::File => baadash_engine::run(&this.client, &req, progress, cancel, this.limiter.clone()).await,

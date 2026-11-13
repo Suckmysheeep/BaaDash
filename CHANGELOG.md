@@ -6,6 +6,17 @@ BaaDash 的重要变更记录于此。格式参考 [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-13
+
+### 修复与交互
+
+- BT 内核强化（参考 koi-bt 等成熟产品的做法）：
+  - 引擎现在监听入站连接并通过 UPnP 自动映射端口——此前只拨出、别人永远连不进来，冷门资源可连节点少一半。
+  - 磁力探测双路竞速：向节点查询元数据的同时，按资源哈希并行请求公共种子缓存站并校验哈希，谁先答用谁——DHT 被污染或受限的网络里，磁力解析从约 90 秒缩短到几秒。
+  - 自动补充公共 tracker（ngosang/trackerslist 每日更新、本地缓存、含国内可达镜像）：磁力解析与下载都会询问更多节点。私有种子（PT）绝不注入。设置 → 通用中可关闭。
+- 死种早提示：磁力探测 60 秒无节点应答时明确提示可能是死种或网络受限；下载中连续 5 分钟零节点时说明「这个种子可能已经没人分享了」，不再无解释地空等。
+- 种子信息来自缓存站且节点为零时，新建任务窗口提示「下载可能长期没有速度」。
+
 ## [0.5.3] - 2026-11-13
 
 ### 修复与交互
@@ -202,7 +213,8 @@ BaaDash 的首个正式版本，以新的项目身份发布，承接此前中文
 - 分享文本功能只提取普通链接，不增加站点专用解析，不绕过登录、会员、DRM 或网站访问限制。
 - 多连接不能突破实际带宽，速度取决于服务器、网络与磁盘；续传取决于服务器是否支持及文件是否变更。
 
-[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/Suckmysheeep/BaaDash/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.4
 [0.5.3]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.3
 [0.5.2]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.2
 [0.5.1]: https://github.com/Suckmysheeep/BaaDash/releases/tag/v0.5.1
